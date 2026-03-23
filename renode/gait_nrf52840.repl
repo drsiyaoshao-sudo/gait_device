@@ -1,0 +1,40 @@
+// Renode platform description — nRF52840 + simulation-mode IMU stub
+//
+// Board: Seeed Studio XIAO nRF52840 Sense
+// Target: gait wearable ankle device (Renode simulation mode)
+//
+// This file wires up:
+//   cpu      nRF52840 Cortex-M4F (from nrf52840.repl)
+//   sim_imu  Python.PythonPeripheral at sysbus 0x400B0000
+//            Serves float32 samples to firmware built with CONFIG_GAIT_RENODE_SIM=y
+//   uart0    UART0 for Zephyr printk / log output
+//
+// Note: The real LSM6DS3TR-C sits on I2C (twi0). Renode 1.16 does not support
+// Python-scripted I2C peripherals (Python.PythonPeripheral is sysbus-only).
+// Instead, a simulation-mode firmware reads from this sysbus-mapped stub.
+//
+// The Python stub (sim_imu_stub.py) reads pre-written float32 samples from
+// /tmp/gait_imu_sim.f32 (written by renode_bridge.py before simulation starts).
+
+using "platforms/cpus/nrf52840.repl"
+
+// ─── Simulation IMU stub ─────────────────────────────────────────────────────
+// sysbus peripheral: firmware in CONFIG_GAIT_RENODE_SIM mode polls this.
+// Register layout (byte offsets):
+//   0x00-0x03  STATUS uint32 LE (1=ready, 0=exhausted)
+//   0x04-0x1B  sample data (6 × float32 = 24 bytes: ax ay az gx gy gz)
+//   0x1C       ACK byte (write to advance)
+
+sim_imu: Python.PythonPeripheral @ sysbus 0x400B0000
+    size: 0x100
+    filename: "sim_imu_stub.py"
+    initable: true
+
+// ─── UART ────────────────────────────────────────────────────────────────────
+// uart0 is declared in nrf52840.repl.  The bridge attaches a file backend
+// after loading this platform description.
+
+// ─── Session button ───────────────────────────────────────────────────────────
+// P0.27 is the active-low session start/stop button in firmware.
+// The bridge simulates button presses via monitor gpio0 commands.
+// (gpio0 is declared in nrf52840.repl)

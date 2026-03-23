@@ -1,0 +1,48 @@
+# Renode scenario — Gait Device nRF52840 simulation
+#
+# Usage (from project root):
+#   renode --disable-xwt renode/gait_device.resc
+#
+# Or via the Renode bridge (simulator/renode_bridge.py) which passes
+# variables below as Renode variables before loading this script:
+#   $elf         = path to firmware.elf
+#   $uart_log    = path where UART output is written (default: /tmp/gait_uart.log)
+#   $imu_bin     = path to quantized IMU binary    (default: /tmp/gait_imu_fifo.bin)
+#
+# The bridge sets these via:
+#   $variable = "value"\n"""
+# at the start of the monitor session before executing this script.
+
+# ─── Variables with defaults ──────────────────────────────────────────────────
+$elf?=".pio/build/xiaoble_sense/firmware.elf"
+$uart_log?="/tmp/gait_uart.log"
+$imu_bin?="/tmp/gait_imu_fifo.bin"
+
+# ─── Machine ──────────────────────────────────────────────────────────────────
+mach create "gait_device"
+machine LoadPlatformDescription @renode/gait_nrf52840.repl
+
+# ─── UART output → file ───────────────────────────────────────────────────────
+# Create a file-backed UART analyzer so the Python bridge can tail the log.
+# The UART0 peripheral is declared in nrf52840.repl; we attach an analyzer here.
+# UART file backend is set by the bridge via monitor command after this resc loads.
+
+# ─── Load firmware ELF ────────────────────────────────────────────────────────
+sysbus LoadELF $elf
+
+# ─── Logging ─────────────────────────────────────────────────────────────────
+# Show LSM6DS3 stub INFO messages in the Renode console for debugging.
+logLevel 3 sim_imu
+
+# ─── Calibration sequence ─────────────────────────────────────────────────────
+# The firmware performs static calibration for ~1 second at boot.  We do NOT
+# need to explicitly feed stationary samples because lsm6ds3_stub.py serves
+# zeros (gyro) and the raw file contains 1 s of stationary prefix (written by
+# renode_bridge.py via imu_model.quantize_to_file with stationary_prefix=True).
+
+# ─── Session button pulse ─────────────────────────────────────────────────────
+# After 1.5 s simulated time, pulse P0.11 low for 50 ms to start a gait session.
+# The bridge handles this via monitor commands after the machine starts running.
+
+# ─── Start ────────────────────────────────────────────────────────────────────
+start

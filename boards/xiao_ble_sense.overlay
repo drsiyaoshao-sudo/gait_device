@@ -1,0 +1,48 @@
+/*
+ * Device tree overlay for Seeed XIAO nRF52840 Sense
+ *
+ * Enables LSM6DSO (register-compatible with LSM6DS3TR-C) on I2C0
+ * with FIFO watermark interrupt on INT1.
+ *
+ * Zephyr board variant: nrf52840dk_nrf52840
+ * Zephyr I2C0 alias: i2c0  (TWI0 on nRF52840 DK → P0.26 SDA, P0.27 SCL)
+ *
+ * For Renode simulation:
+ *   INT1 is wired to gpio0.pin11 in renode/gait_nrf52840.repl.
+ *   The Python stub asserts this line when FIFO reaches watermark (32 samples).
+ *
+ * On real XIAO hardware the SDA/SCL are on different pads; the nRF52840 DK
+ * Zephyr BSP wires &i2c0 to the DK's Arduino-compatible header — both are
+ * on the same nRF52840 TWI0 peripheral so register-level firmware is
+ * identical.
+ */
+
+&i2c0 {
+    status = "okay";
+
+    lsm6dso: lsm6dso@6a {
+        compatible = "st,lsm6dso";    /* LSM6DSO driver; register-compatible with LSM6DS3TR-C */
+        reg = <0x6a>;
+        irq-gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>;  /* INT1 → P0.11 */
+        int-pin = <1>;
+    };
+};
+
+/* Status LED — DK LED1 is P0.13 (active low on DK, active high on XIAO; same logic) */
+/ {
+    leds {
+        compatible = "gpio-leds";
+        led_status: led_0 {
+            gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
+            label = "Status LED";
+        };
+    };
+
+    buttons {
+        compatible = "gpio-keys";
+        btn_session: btn_0 {
+            gpios = <&gpio0 27 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Session Button";
+        };
+    };
+};

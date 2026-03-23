@@ -1,0 +1,18 @@
+# Gait device application Kconfig
+#
+# Top-level symbol declarations for the gait_device firmware.
+# Zephyr's Kconfig system reads this file from the project root.
+
+mainmenu "Gait Device Configuration"
+
+config GAIT_RENODE_SIM
+	bool "Renode simulation mode (CONFIG_GAIT_RENODE_SIM)"
+	default n
+	help
+	  Build the firmware in Renode simulation mode.
+	  Replaces the real LSM6DS3 I2C IMU driver with a sysbus-mapped
+	  Python peripheral stub (imu_sim_reader.c) that reads pre-written
+	  float32 samples from /tmp/gait_imu_sim.f32.
+	  Also skips BLE init and NVS calibration for headless simulation.
+
+source "Kconfig.zephyr"
