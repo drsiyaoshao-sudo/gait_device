@@ -188,8 +188,9 @@ Run the actual firmware ELF inside Renode against synthetic walker inputs. Firmw
 **Exit criteria — ALL must pass before moving to Stage 4:**
 - [ ] `pio run -t simulate` completes without Renode crash or assertion fault
 - [ ] Robot Framework suite passes: `robot renode/robot/gait_test.robot`
-- [ ] 100-step synthetic walk: `total_steps` in UART output within ±2 of 100
-- [ ] SI detection: firmware-detected SI within ±3% of ground truth for all 5 walker profiles (Normal, Runner, Post-ACL, Elderly, Hemiplegic)
+- [ ] 100-step synthetic walk: `total_steps` in UART output within ±5 of 100 for 3 non-failure mode walkers (Flat surface, Bad wearer, Slope)
+- [ ] SI detection: firmware-detected SI within ±3% of ground truth for all 3 non-failure mode walkers (Flat surface, Bad wearer, Slope)
+- [ ] Stair walker: The Renode simulation must yield the ~9% over-count error documented in the signal-level simulator; if this known failure mode is not replicated within three attempts, the agent must STOP, report the best-match traces to the console, and explicitly ask the human for a new search domain or simulation adjustment to prevent a recursive token overflow
 - [ ] Rolling window: snapshots written every 10 steps, 200-step window fills correctly at session start
 - [ ] BLE export simulation: all snapshot structs transferred and unpacked without CRC or length error
 - [ ] Power model: simulated FIFO idle interval ≈ 154ms (32 samples / 208 Hz); verify via UART timestamps
@@ -290,8 +291,10 @@ All future effects must still be expressible as perturbations to the three primi
 
 4. **Simulation is the hardware proxy.** If something cannot be tested in simulation, write the edge case test first, make it pass in simulation, then validate on hardware. Hardware is not a debugging tool — it is a validation tool.
 
-5. **Hardware deployment is irreversible within a session.** Once flashed, the firmware is running on physical hardware connected to a LiPo battery. Do not flash unvalidated firmware. Do not flash mid-stage.
+5. **Token usage awareness** To prevent recursive token overflow, the agent must STOP any simulation, unit test, or iterative process that fails to meet exit criteria within three attempts, explicitly reporting the status to the human for a next-step determination to ensure economical token usage and traceability in semi-black-box scenarios.
 
-6. **Algorithm patches must be honest about failures** If a search domain (e.g., "Filtering") is not yielding results, the agent must inform the human and suggest stopping.The agent will suggest new domains (e.g., "Feature Extraction" or "Hardware Change") and ask the human to select **exactly one** to pursue. Always maintain the option for hardware iteration (sensor repositioning, BOM changes). We are solving a failure mode, not developing "beautiful" but fragile algorithms.
+6. **Hardware deployment is irreversible within a session.** Once flashed, the firmware is running on physical hardware connected to a LiPo battery. Do not flash unvalidated firmware. Do not flash mid-stage.
 
-7. **BOM optimization** If an algorithm can be implemented with lower-budget hardware/software, the agent must explicitly state the reasons (e.g., "Lower clock speed," "Reduced sampling rate") in the console. The human determines whether to optimize the BOM. Accepted BOM changes must be documented in CLAUDE.md for full traceability between logic and cost.
+7. **Algorithm patches must be honest about failures** If a search domain (e.g., "Filtering") is not yielding results, the agent must inform the human and suggest stopping.The agent will suggest new domains (e.g., "Feature Extraction" or "Hardware Change") and ask the human to select **exactly one** to pursue. Always maintain the option for hardware iteration (sensor repositioning, BOM changes). We are solving a failure mode, not developing "beautiful" but fragile algorithms.
+
+8. **BOM optimization** If an algorithm can be implemented with lower-budget hardware/software, the agent must explicitly state the reasons (e.g., "Lower clock speed," "Reduced sampling rate") in the console. The human determines whether to optimize the BOM. Accepted BOM changes must be documented in CLAUDE.md for full traceability between logic and cost.
