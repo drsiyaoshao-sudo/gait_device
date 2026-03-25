@@ -7,15 +7,19 @@
 Eliminate the "Hardware-Software Death Spiral" by using a 7-Layer Digital Twin to pre-validate failure modes before physical fabrication
 
 ```
-1. Physics-Native Simulation: We don't inject sensor readings, we inject first order measureable quantities to the simulator
+1. Physics-Native Simulation: We don't inject sensor readings, we inject first order measureable quantities to the simulator.
 
-2. Deterministic Auditing: Every algorithmic change is verified against the known failure modes
+2. Deterministic Auditing: Every algorithmic change is verified against the known failure modes.
 
-3. Instruction-Level Readiness: Current logic is validated in a bare-metal C environment, ensuring the math survives the transition from Python to MCU registers
+3. Instruction-Level Readiness: Current logic is validated in a bare-metal C environment, ensuring the math survives the transition from Python to MCU registers.
 
-4. The Recursive Loop: This document serves as the system's "State Observer"—capturing the 0-to-1 learning process for developer and engineers using this method
+4. The Recursive Loop: This document serves as the system's "State Observer"—capturing the 0-to-1 learning process for developer and engineers using this method.
 
-5. The big milestone of proof-of-concept: Capture known failure mode of stair walker profile on both python simulator and bare-metal C simulator; Guided Claude Code search for the fix; Simulation of algorithm patch on both python sumulator and bare-metal C; Handoff of project hardware, firmware, and software and their BOMs to a third party for physical device validation to understand "the good", "the bad" and "the ugly"
+5. The Big Milestone of Proof-of-Concept:
+   - Capture known failure modes of the "Stair Walker" profile on both the Python and bare-metal C simulators.
+   - Guided Claude Code search for the algorithmic fix.
+   - Simulation of the algorithm patch on both platforms to verify the "Ghost" is caught.
+   - Handoff of project hardware, firmware, software, and their BOMs to a third party for physical device validation to understand "the good," "the bad," and "the ugly" of this approach.
 ```
 ## Development Philosophy
 
