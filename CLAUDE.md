@@ -1,5 +1,20 @@
 # CLAUDE.md — Gait Device Project
 
+## Purpose of this project: a proof-of-concept for CI/CD of hardware software codesign
+
+**High level mission statement**
+
+Eliminate the "Hardware-Software Death Spiral" by using a 7-Layer Digital Twin to pre-validate failure modes before physical fabrication
+
+```
+1. Physics-Native Simulation: We don't inject sensor readings, we inject first order measureable quantities to the simulator
+
+2. Deterministic Auditing: Every algorithmic change is verified against the known failure modes
+
+3. Instruction-Level Readiness: Current logic is validated in a bare-metal C environment, ensuring the math survives the transition from Python to MCU registers
+
+4. The Recursive Loop: This document serves as the system's "State Observer"—capturing the 0-to-1 learning process for developer and engineers using this method
+```
 ## Development Philosophy
 
 **The development order is fixed and must never change:**
