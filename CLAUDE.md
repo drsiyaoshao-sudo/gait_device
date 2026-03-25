@@ -14,6 +14,8 @@ Eliminate the "Hardware-Software Death Spiral" by using a 7-Layer Digital Twin t
 3. Instruction-Level Readiness: Current logic is validated in a bare-metal C environment, ensuring the math survives the transition from Python to MCU registers
 
 4. The Recursive Loop: This document serves as the system's "State Observer"—capturing the 0-to-1 learning process for developer and engineers using this method
+
+5. The big milestone of proof-of-concept: Capture known failure mode of stair walker profile on both python simulator and bare-metal C simulator; Guided Claude Code search for the fix; Simulation of algorithm patch on both python sumulator and bare-metal C; Handoff of project hardware, firmware, and software and their BOMs to a third party for physical device validation to understand "the good", "the bad" and "the ugly"
 ```
 ## Development Philosophy
 
