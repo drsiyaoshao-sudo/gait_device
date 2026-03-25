@@ -29,7 +29,7 @@ Eliminate the "Hardware-Software Death Spiral" by using a 7-Layer Digital Twin t
 1. Firmware  →  2. Software  →  3. Simulation  →  4. Edge Cases  →  5. Hardware Deployment
 ```
 
-Every step must be confirmed correct before advancing to the next. The purpose is to collapse the development cycle: catch bugs in firmware logic before simulation, catch simulation failures before touching hardware, and catch edge cases before deployment. Hardware is expensive to debug — everything before it is not.
+Every step must be confirmed correct before advancing to the next. The purpose is to collapse the development cycle: catch algorithmic failures before firmware, catch bugs in firmware logic before simulation, catch simulation failures before touching hardware, and catch edge cases before deployment. Hardware is expensive to debug — everything before it is not.
 
 ---
 
@@ -60,7 +60,8 @@ terrain_type                    →  signal morphology (sinusoidal / non-sinusoi
 
 - Simulator walker profiles must specify `vertical_oscillation_cm`, `cadence_spm`, `step_length_m` as primary fields. All other signal parameters derive from them.
 - Any threshold magic number must be traceable to a first-order physical quantity, not a raw axis reading.
-
+- All calibration procedures must be documented in Claude.md dedicated section and limited to be one calibration per algorithmic iteration.
+- During iterative building and debugging, intermediate results must be printed to the console for human review. Claude must wait for a human determination of the next step before proposing action items. The specific human prompt/decision must be explicitly recorded in CLAUDE.md.
 ---
 
 ## Simulation Pipeline — Tech Stack
@@ -182,6 +183,7 @@ Run the actual firmware ELF inside Renode against synthetic walker inputs. Firmw
 - IMU feeder (`renode/robot/imu_feeder.py`): generate walking sequences, inject via Renode Python API
 - Robot Framework suite (`renode/robot/gait_test.robot`): build → simulate → assert UART output
 - Digital Twin UI: end-to-end run with Renode bridge, plot detected SI vs ground truth SI
+- Estimate power consumption, RAM usage, MCU clock speed, the goal is not to make it work, it is to make it work within budget
 
 **Exit criteria — ALL must pass before moving to Stage 4:**
 - [ ] `pio run -t simulate` completes without Renode crash or assertion fault
@@ -191,6 +193,7 @@ Run the actual firmware ELF inside Renode against synthetic walker inputs. Firmw
 - [ ] Rolling window: snapshots written every 10 steps, 200-step window fills correctly at session start
 - [ ] BLE export simulation: all snapshot structs transferred and unpacked without CRC or length error
 - [ ] Power model: simulated FIFO idle interval ≈ 154ms (32 samples / 208 Hz); verify via UART timestamps
+- [ ] Power consumption, RAM usage, MCU clock speed are in the budget of the proposed device
 
 **Do not proceed to Stage 4 if Robot Framework suite fails or SI accuracy is outside tolerance.**
 
@@ -288,3 +291,7 @@ All future effects must still be expressible as perturbations to the three primi
 4. **Simulation is the hardware proxy.** If something cannot be tested in simulation, write the edge case test first, make it pass in simulation, then validate on hardware. Hardware is not a debugging tool — it is a validation tool.
 
 5. **Hardware deployment is irreversible within a session.** Once flashed, the firmware is running on physical hardware connected to a LiPo battery. Do not flash unvalidated firmware. Do not flash mid-stage.
+
+6. **Algorithm patches must be honest about failures** If a search domain (e.g., "Filtering") is not yielding results, the agent must inform the human and suggest stopping.The agent will suggest new domains (e.g., "Feature Extraction" or "Hardware Change") and ask the human to select **exactly one** to pursue. Always maintain the option for hardware iteration (sensor repositioning, BOM changes). We are solving a failure mode, not developing "beautiful" but fragile algorithms.
+
+7. **BOM optimization** If an algorithm can be implemented with lower-budget hardware/software, the agent must explicitly state the reasons (e.g., "Lower clock speed," "Reduced sampling rate") in the console. The human determines whether to optimize the BOM. Accepted BOM changes must be documented in CLAUDE.md for full traceability between logic and cost.
