@@ -1,6 +1,6 @@
 # CLAUDE.md — Gait Device Project
 
-## Purpose of this project: a proof-of-concept for CI/CD of hardware software codesign
+## Purpose of this project: a proof-of-concept for agentic CI/CD of hardware software codesign
 
 **High level mission statement**
 
