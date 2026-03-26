@@ -17,8 +17,8 @@ Eliminate the "Hardware-Software Death Spiral" by using a 7-Layer Digital Twin t
 
 5. The Big Milestone of Proof-of-Concept:
    - Capture known failure modes of the "Stair Walker" profile on both the Python and bare-metal C simulators.
-   - Guided Claude Code search for the algorithmic fix.
-   - Simulation of the algorithm patch on both platforms to verify the "Ghost" is caught.
+   - Guided Claude Code search for the algorithmic and hardware fix.
+   - Simulation of the fix on both platforms to verify the "Ghost" is caught.
    - Handoff of project hardware, firmware, software, and their BOMs to a third party for physical device validation to understand "the good," "the bad," and "the ugly" of this approach.
 ```
 ## Development Philosophy
@@ -190,7 +190,7 @@ Run the actual firmware ELF inside Renode against synthetic walker inputs. Firmw
 - [ ] Robot Framework suite passes: `robot renode/robot/gait_test.robot`
 - [ ] 100-step synthetic walk: `total_steps` in UART output within ±5 of 100 for 3 non-failure mode walkers (Flat surface, Bad wearer, Slope)
 - [ ] SI detection: firmware-detected SI within ±3% of ground truth for all 3 non-failure mode walkers (Flat surface, Bad wearer, Slope)
-- [ ] Stair walker: The Renode simulation must yield the ~9% over-count error documented in the signal-level simulator; if this known failure mode is not replicated within three attempts, the agent must STOP, report the best-match traces to the console, and explicitly ask the human for a new search domain or simulation adjustment to prevent a recursive token overflow
+- [ ] Stair walker: The Renode simulation must yield mis-count error documented in the signal-level simulator; if this known failure mode is not replicated within three attempts, the agent must STOP, report the best-match traces to the console, and explicitly ask the human for a new search domain or simulation adjustment to prevent a recursive token overflow
 - [ ] Rolling window: snapshots written every 10 steps, 200-step window fills correctly at session start
 - [ ] BLE export simulation: all snapshot structs transferred and unpacked without CRC or length error
 - [ ] Power model: simulated FIFO idle interval ≈ 154ms (32 samples / 208 Hz); verify via UART timestamps
@@ -200,7 +200,7 @@ Run the actual firmware ELF inside Renode against synthetic walker inputs. Firmw
 
 ---
 
-### Stage 4 — Edge Cases
+### Stage 4 — Edge Cases (the edge cases are more related to hardware capacity and failure not walker profiles)
 Stress-test the system against boundary conditions, adversarial inputs, and failure modes. This stage happens entirely in simulation and unit tests — no hardware yet.
 
 **Work done here:**
@@ -297,4 +297,4 @@ All future effects must still be expressible as perturbations to the three primi
 
 7. **Algorithm patches must be honest about failures.** If a search domain (e.g., "Filtering") is not yielding results, the agent must inform the human and suggest stopping.The agent will suggest new domains (e.g., "Feature Extraction" or "Hardware Change") and ask the human to select **exactly one** to pursue. Always maintain the option for hardware iteration (sensor repositioning, BOM changes). We are solving a failure mode, not developing "beautiful" but fragile algorithms.
 
-8. **BOM optimization** If an algorithm can be implemented with lower-budget hardware/software, the agent must explicitly state the reasons (e.g., "Lower clock speed," "Reduced sampling rate") in the console. The human determines whether to optimize the BOM. Accepted BOM changes must be documented in CLAUDE.md for full traceability between logic and cost.
+8. **BOM optimization** If an algorithm can be implemented with lower-budget hardware/software compared against the sample BOMs (hw_bom.md and sw.bom_md), the agent must explicitly state so and the reasons (e.g., "Lower clock speed," "Reduced sampling rate") in the console. The human determines whether to optimize the BOM. Accepted BOM changes must be documented in CLAUDE.md for full traceability between logic and cost.
