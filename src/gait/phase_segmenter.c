@@ -144,7 +144,7 @@ void phase_segmenter_update(const imu_sample_t *s)
 
     case PHASE_LOADING:
         /* Wait for stable ground contact */
-        if (acc_z_lp > (0.85f * 9.81f) && acc_mag < ACC_MAG_HP_MID_THRESH) {
+        if (acc_z_lp > (0.85f * 9.81f) && fabsf(acc_mag - 9.81f) < ACC_MAG_HP_MID_THRESH) {
             transition(PHASE_MID_STANCE, s->ts_ms);
         }
         break;

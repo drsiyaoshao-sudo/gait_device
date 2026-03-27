@@ -13,56 +13,88 @@
 # File format (/tmp/gait_imu_sim.f32):
 #   N x 24 bytes, each = [ax ay az gx gy gz] float32 LE
 #   Written by simulator/renode_bridge.py before Renode starts.
+#
+# State persistence strategy: file-based _idx avoids IronPython in-memory
+# list truncation (large _samples list silently capped at ~5 entries in
+# Renode 1.16 embedded IronPython context).
+# _idx is stored in /tmp/stub_idx.txt on every ACK write.
+# _cur_bytes (24 bytes) is kept as a module global -- small enough to be safe.
 
 import struct
 import os
 
 _SIM_F32_PATH = "/tmp/gait_imu_sim.f32"
+_IDX_PATH     = os.path.expanduser("~/.gait_stub_idx.txt")
 
-# Guard against module-level code resetting state on each re-exec.
-# Renode re-executes this script for every peripheral access.
-# Use 'if not in globals()' so state survives across calls.
-if '_samples' not in dir():
-    _samples = []
-    _idx = 0
+
+def _n_samples():
+    try:
+        return os.path.getsize(_SIM_F32_PATH) // 24
+    except Exception:
+        return 0
+
+
+def _read_idx():
+    try:
+        return int(open(_IDX_PATH, "r").read().strip())
+    except Exception:
+        return 0
+
+
+def _write_idx(idx):
+    f = open(_IDX_PATH, "w")
+    f.write(str(idx))
+    f.close()
+
+
+def _load_sample(idx):
+    # Read exactly one 24-byte sample from the f32 file at the given index.
+    try:
+        f = open(_SIM_F32_PATH, "rb")
+        f.seek(idx * 24)
+        raw = f.read(24)
+        f.close()
+        if len(raw) == 24:
+            return raw
+    except Exception:
+        pass
+    return b'\x00' * 24
+
+
+# Module-level cache for the current sample bytes (24 bytes only -- safe for IronPython).
+if '_cur_bytes' not in globals():
     _cur_bytes = b'\x00' * 24
 
 
-def _pack_current():
-    global _cur_bytes
-    if _idx < len(_samples):
-        _cur_bytes = struct.pack("<ffffff", *_samples[_idx])
-    else:
-        _cur_bytes = b'\x00' * 24
-
-
 if request.IsInit:
-    _samples = []
-    _idx = 0
-    if os.path.exists(_SIM_F32_PATH):
-        raw = open(_SIM_F32_PATH, "rb").read()
-        n = len(raw) // 24
-        for i in range(n):
-            _samples.append(struct.unpack_from("<ffffff", raw, i * 24))
-        self.NoisyLog("sim_imu_stub: loaded %d samples from %s" % (n, _SIM_F32_PATH))
-    else:
-        self.NoisyLog("sim_imu_stub: file not found: %s" % _SIM_F32_PATH)
-    _pack_current()
+    _write_idx(0)
+    _cur_bytes = _load_sample(0)
+    n = _n_samples()
+    self.NoisyLog("sim_imu_stub: file-based idx, %d samples, path=%s" % (n, _SIM_F32_PATH))
 
 elif request.IsRead:
     off = request.Offset
     if off < 4:
-        status = 1 if _idx < len(_samples) else 0
+        idx = _read_idx()
+        n   = _n_samples()
+        status = 1 if idx < n else 0
         request.Value = (status >> (off * 8)) & 0xFF
     elif 4 <= off < 28:
-        request.Value = ord(_cur_bytes[off - 4]) if isinstance(_cur_bytes[off - 4], str) else _cur_bytes[off - 4]
+        # Load fresh sample bytes when reading first data byte (offset 4).
+        # Subsequent bytes within the same sample use the cached _cur_bytes.
+        if off == 4:
+            idx = _read_idx()
+            _cur_bytes = _load_sample(idx)
+        b = _cur_bytes[off - 4]
+        request.Value = ord(b) if isinstance(b, str) else b
     else:
         request.Value = 0
 
 elif request.IsWrite:
     if request.Offset == 0x1C:
-        if _idx < len(_samples):
-            _idx += 1
-            _pack_current()
-            if _idx >= len(_samples):
-                self.NoisyLog("sim_imu_stub: all %d samples consumed" % len(_samples))
+        idx = _read_idx()
+        n   = _n_samples()
+        if idx < n:
+            _write_idx(idx + 1)
+            if idx + 1 >= n:
+                self.NoisyLog("sim_imu_stub: all %d samples consumed" % n)
