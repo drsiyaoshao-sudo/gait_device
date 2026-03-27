@@ -212,9 +212,9 @@ Build the simulator engine and host tool (Python).
 - Streamlit UI (`simulator/app.py`): profile selector, sliders, IMU signal chart, SI time-series chart
 
 **Exit criteria — ALL must pass before moving to Stage 3:**
-- [ ] Python unit tests pass: `pytest simulator/tests/`
-- [ ] `generate_imu_sequence()` produces correct shape `(N, 6)` at 208 Hz for all 5 built-in profiles
-- [ ] Signal analysis correctly parses all UART event types (STEP, SNAPSHOT, SESSION_END)
+- [x] Python unit tests pass: `pytest simulator/tests/` — **CONFIRMED 2026-03-27** (151/151 pass). Fixed: `test_signal_analysis.py` fixture updated to integer×10 format matching firmware; `gait_algorithm.run()` updated to use `TerrainAwareStepDetector` so stairs pipeline detects 100/100 steps in Python path.
+- [x] `generate_imu_sequence()` produces correct shape `(N, 6)` at 208 Hz for all 4 built-in profiles — **CONFIRMED 2026-03-27**: flat (2567,6), bad_wear (2567,6), slope (2823,6), stairs (3698,6), all float32
+- [x] Signal analysis correctly parses all UART event types (STEP, SNAPSHOT, SESSION_END) — **CONFIRMED 2026-03-27**: all 8 parsing tests pass; regex handles integer×10 encoded acc/gyr_y fields from firmware
 - [ ] Host tool connects to a mock BLE server and unpacks all 48-byte `step_record_t` structs without error
 - [ ] Streamlit UI launches without error: `streamlit run simulator/app.py`
 

@@ -18,7 +18,7 @@ from gait_algorithm import StepEvent, SnapshotEvent, SessionEndEvent
 
 # ── parse_line: STEP ─────────────────────────────────────────────────────────
 
-STEP_LINE = "STEP #5 ts=3012 acc=24.7 gyr_y=-63.2 cadence=100.0 spm"
+STEP_LINE = "STEP #5 ts=3012 acc=247 gyr_y=-632 cadence=100 spm"
 
 def test_parse_step_type():
     ev = parse_line(STEP_LINE)
@@ -102,8 +102,8 @@ def test_parse_unknown_returns_none(line):
 
 _LOG = """\
 [00:00:00.001] booting
-STEP #0 ts=1024 acc=19.4 gyr_y=-45.0 cadence=0.0 spm
-STEP #1 ts=1624 acc=18.9 gyr_y=-51.2 cadence=100.0 spm
+STEP #0 ts=1024 acc=194 gyr_y=-450 cadence=0 spm
+STEP #1 ts=1624 acc=189 gyr_y=-512 cadence=100 spm
 SNAPSHOT step=9 si_stance=0.5% si_swing=0.1% cadence=100.0 spm
 SESSION_END steps=100
 noise line ignored

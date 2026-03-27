@@ -524,7 +524,12 @@ def run(samples: np.ndarray,
         records.append(rec)
         win.add(rec)
 
-    det = StepDetector(on_step=on_step)
+    from terrain_aware_step_detector import (
+        TerrainAwareStepDetector,
+        StepEvent as _TStepEvent,
+    )
+
+    det = TerrainAwareStepDetector()
     seg = PhaseSegmenter(foot_angle=fa, on_step=on_record)
 
     cal = samples - bias
@@ -533,13 +538,22 @@ def run(samples: np.ndarray,
         ax, ay, az, gx, gy, gz = row
         ts_ms = i / ODR_HZ * 1000.0
         fa.update(ax, az, gy)
-        det.update(ax, ay, az, gy, ts_ms)
+        tev: _TStepEvent | None = det.update(ts_ms, ax, ay, az, gy)
+        if tev is not None:
+            ev = StepEvent(
+                step_index   = tev.step_index,
+                ts_ms        = tev.heel_strike_ts_ms,   # heel-strike ts for phase segmenter
+                peak_acc_mag = tev.acc_peak_ms2,
+                peak_gyr_y   = 0.0,
+                cadence_spm  = det._cadence_spm,
+            )
+            on_step(ev)
         seg.update(ax, az, gy, ts_ms)
 
         if i == n_cal - 1:
-            # Calibration window complete.  Reset state machines (not filter
-            # state) and open the event gate so real walking steps are emitted.
-            det.reset_state_only()
+            # Calibration window complete.  Reset state machines and open the
+            # event gate so real walking steps are emitted.
+            det.reset()
             seg.reset()
             fa.reset()
             _cal_done = True
