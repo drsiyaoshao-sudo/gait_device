@@ -404,3 +404,51 @@ All plots are saved to `docs/plots/` for project traceability.
 2. **acc_x DC injection is correct.** Mean ≈ 1.51 m/s² vs g·sin(10°) = 1.70 m/s²; same swing averaging deficit. The 10° slope projects a constant gravity component onto acc_x throughout the session. This is the signal that makes the standard flat-ground SI algorithm report corrupted values on slope — the key failure mode the stair/slope terrain tests exist to capture.
 
 3. **gyr_y gate is reliably crossed.** Every step shows the initial dorsiflexion dipping below −10 dps (MID→TERM gate, purple dashed line), the ankle rocker 2 ramp sustaining negative gyr_y through mid-stance, and strong push-off peaks at ~178 dps. Consistent with 18 snapshots per 100-step run and SI = 0.0% — the phase segmenter cycles correctly on slope terrain.
+
+---
+
+### Stair walker signal check — confirmed 2026-03-27
+
+**Plot:** `docs/plots/stair_walker_signal_check.png`
+
+![Stair walker signal](docs/plots/stair_walker_signal_check.png)
+
+**Failure mode: dual-confirmation timing mismatch (BUG-010, CAPTURED)**
+
+Result: **0/50 steps detected** in firmware ELF running on virtual nRF52840.
+
+The step detector uses a dual-confirmation gate:
+```
+step valid = acc_filt peak > threshold  AND  gyr_y zero-crossing within GYR_CONFIRM_MS (40ms)
+```
+
+Signal-level measurements from the diagnostic plot:
+
+| Signal | Flat walker | Stair walker |
+|---|---|---|
+| acc_filt peak | 7.44 m/s² (above 5.0 threshold) | 7.44 m/s² (above 5.0 threshold) |
+| acc_filt peak timing | phase 0.57 (572ms) | phase 0.425 (188ms into stance) |
+| gyr_y zero-crossing | phase 0.03 (34ms) | phase 0.10 (53ms into stance) |
+| Temporal separation | 538ms | **135ms** |
+| Verdict | steps detected correctly | **TIMEOUT — step discarded** |
+
+**Root cause — broken kinematic assumption:**
+The dual-confirmation gate assumes heel-strike biomechanics: heel impact simultaneously drives an `acc_filt` impulse and arrests plantar-flexion (forcing a `gyr_y` sign reversal). These two events are co-incident on flat ground.
+
+On stairs, the foot contacts at **mid/forefoot** (already dorsiflexed at the moment of placement):
+- `gyr_y` crosses zero immediately at contact (~53ms) as the foot lands
+- The foot then loads progressively under body weight — `acc_filt` peaks much later (~188ms)
+- Separation (135ms) far exceeds the 40ms confirmation window → step is rejected
+
+The algorithm is not failing to detect the signal (amplitude is adequate). It is failing to confirm it because the gyro crossing arrives 135ms before the acc spike, having already expired from the window.
+
+**Three fix domains (human must select one before implementation):**
+
+1. **Feature Extraction** — Remove the gyro confirmation gate; use `acc_filt` threshold alone. Reduces false-positive rejection capability on non-step vibrations. Lowest implementation cost.
+
+2. **Terrain Classification** — Detect stair gait pre-emptively (elevated cadence, reduced acc_z DC, irregular step intervals) and conditionally widen or bypass `GYR_CONFIRM_MS`. Moderate complexity; requires a reliable terrain classifier upstream.
+
+3. **Hardware Change** — Add a second IMU at the shin (not ankle). Tibial rotation at stair contact is temporally coincident with foot loading, restoring the dual-confirmation assumption without algorithm restructuring. Changes the BOM.
+
+**Status:** Fix domain not yet selected. Awaiting human decision. Per Rule 8, exactly one domain must be chosen before any implementation begins.
+
