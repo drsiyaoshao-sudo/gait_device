@@ -5,11 +5,13 @@ Exit criteria (all must pass before porting to C):
   1. flat    100 steps → detected within ±5
   2. bad_wear 100 steps → detected within ±5
   3. slope   100 steps → detected within ±5
-  4. stairs   50 steps → detected within ±5  ← key regression fix
+  4. stairs  100 steps → detected within ±5  ← key regression fix
   5. SI_interval < 3% for all non-failure profiles (symmetric walkers)
   6. SI_interval < 3% for stairs (symmetric walker, now detectable)
   7. False-positive guard: zero steps on 5s stationary signal
   8. Minimum step interval enforced: no two steps < 250ms apart
+  9. Option C heel-strike ring buffer: stance_duration within tolerance (all 4 profiles)
+ 10. Option C: swing_duration populated and within tolerance (all 4 profiles)
 """
 
 import sys
@@ -127,3 +129,63 @@ def test_minimum_step_interval():
             f"Step interval {interval:.1f}ms < {MIN_STEP_INTERVAL_MS}ms "
             f"between steps {i-1} and {i}"
         )
+
+
+# ── Option C stance/swing accuracy tests ──────────────────────────────────────
+#
+# Ground truth from walker_model (all symmetric profiles):
+#   flat/bad_wear : step_period=571ms, stance_frac=0.60 → stance=343ms, swing=229ms
+#   slope (10°)  : step_period=632ms, stance_frac=0.62 → stance=392ms, swing=240ms
+#   stairs        : step_period=857ms, stance_frac=0.65 → stance=557ms, swing=300ms
+#
+# Option C tolerance:
+#   flat/bad_wear/slope : heel-strike from sharp acc impulse → ±80ms
+#   stairs              : heel-strike from first sigmoid crossing → ±150ms
+#   (Option C docs: expected -50 to -100ms error on stairs; better than +295ms without it)
+#
+# swing_duration (steps 5..N-2 to skip warmup and last step): within ±100ms of GT
+
+@pytest.mark.parametrize("profile_key,gt_stance_ms,stance_tol_ms", [
+    ("flat",     343.0, 80),
+    ("bad_wear", 343.0, 80),
+    ("slope",    392.0, 80),
+    ("stairs",   557.0, 150),
+])
+def test_option_c_stance_duration(profile_key, gt_stance_ms, stance_tol_ms):
+    """Option C: mean stance_duration_ms within tolerance of ground truth (steps 5+)."""
+    steps = run_detector(PROFILES[profile_key], 100, seed=42)
+    assert len(steps) >= 10, f"{profile_key}: too few steps ({len(steps)}) to evaluate stance"
+    # Skip warmup steps (first 4) and last step (swing not yet filled)
+    core = [s for s in steps if s.step_index >= 4]
+    assert core, f"{profile_key}: no steps after warmup"
+    mean_stance = sum(s.stance_duration_ms for s in core) / len(core)
+    err = mean_stance - gt_stance_ms
+    assert abs(err) <= stance_tol_ms, (
+        f"{profile_key}: mean stance_duration={mean_stance:.1f}ms  "
+        f"GT={gt_stance_ms:.0f}ms  error={err:+.1f}ms  tol=±{stance_tol_ms}ms"
+    )
+
+
+@pytest.mark.parametrize("profile_key,gt_swing_ms,swing_tol_ms", [
+    ("flat",     229.0, 100),
+    ("bad_wear", 229.0, 100),
+    ("slope",    240.0, 100),
+    ("stairs",   300.0, 150),
+])
+def test_option_c_swing_duration(profile_key, gt_swing_ms, swing_tol_ms):
+    """Option C: swing_duration populated for all steps except the last; mean within tolerance."""
+    steps = run_detector(PROFILES[profile_key], 100, seed=42)
+    assert len(steps) >= 10, f"{profile_key}: too few steps"
+    # Skip warmup (first 4) and last step (swing_duration stays 0.0 — next push-off not yet fired)
+    core = [s for s in steps if s.step_index >= 4 and s.step_index < len(steps) - 1]
+    assert core, f"{profile_key}: no steps in core window"
+    zero_swing = [s.step_index for s in core if s.swing_duration_ms == 0.0]
+    assert not zero_swing, (
+        f"{profile_key}: swing_duration=0 on steps {zero_swing} (Option C backfill failed)"
+    )
+    mean_swing = sum(s.swing_duration_ms for s in core) / len(core)
+    err = mean_swing - gt_swing_ms
+    assert abs(err) <= swing_tol_ms, (
+        f"{profile_key}: mean swing_duration={mean_swing:.1f}ms  "
+        f"GT={gt_swing_ms:.0f}ms  error={err:+.1f}ms  tol=±{swing_tol_ms}ms"
+    )

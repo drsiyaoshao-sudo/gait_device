@@ -51,6 +51,9 @@ CADENCE_RUN_THRESH: float = 130.0    # spm boundary walk/run
 MIN_STEP_INTERVAL_MS: int = 250      # 240 spm max cadence
 PEAK_HISTORY: int         = 8        # steps for adaptive acc threshold
 ACC_SEED_MS2: float       = 10.0     # seed threshold: ~1g extra above gravity
+HS_RING_SIZE: int         = 8        # Option C: ring buffer entries for rejected
+                                      # acc_filt crossings → retrospective heel-strike
+                                      # 8 entries × 4 bytes = 32 bytes RAM in C
 GYR_PUSHOFF_THRESH_DPS: float = 30.0 # gyr_y_hp must exceed this positive value
                                       # before the falling-edge is counted as push-off.
                                       # Physical grounding:
@@ -80,8 +83,13 @@ def _alpha_lp(fc_hz: float) -> float:
 @dataclass
 class StepEvent:
     step_index: int
-    ts_ms: float          # push-off timestamp (end of stance)
-    acc_peak_ms2: float   # max acc_filt seen during this stance
+    ts_ms: float               # push-off timestamp (end of stance)
+    acc_peak_ms2: float        # max acc_filt seen during this stance
+    heel_strike_ts_ms: float   # Option C: retrospective heel-strike timestamp
+                               # = first acc_filt threshold crossing since last step
+                               # Falls back to push-off ts if no crossing stored
+    stance_duration_ms: float  # push-off ts − heel_strike ts (Option C derived)
+    swing_duration_ms: float   # filled in after next step fires (0 until then)
 
 
 # ── Detector ──────────────────────────────────────────────────────────────────
@@ -113,6 +121,12 @@ class TerrainAwareStepDetector:
         self._acc_peak_this_step: float = 0.0
         self._acc_above: bool = False          # acc_filt exceeded threshold this stance
         self._in_pushoff: bool = False         # gyr_y_hp is above push-off threshold
+
+        # Option C — ring buffer of acc_filt threshold crossings (rejected heel-strikes)
+        # Stores timestamps of each new acc_filt > threshold event since last confirmed step.
+        # On push-off, oldest entry newer than last_step_ts is used as heel_strike_ts.
+        self._hs_ring: list[float] = []        # timestamps in chronological order
+        self._acc_was_below: bool = True       # tracks crossing (below→above threshold)
 
         # Step state
         self._steps: List[StepEvent] = []
@@ -195,11 +209,23 @@ class TerrainAwareStepDetector:
 
         thresh = self._threshold()
 
-        # ── acc confirmation tracking ─────────────────────────────────────────
+        # ── acc confirmation tracking + Option C ring buffer ─────────────────
         if acc_filt > thresh:
             self._acc_above = True
             if acc_filt > self._acc_peak_this_step:
                 self._acc_peak_this_step = acc_filt
+            # Option C: record first below→above crossing into ring buffer.
+            # These are the "rejected" heel-strike candidates — the same acc peaks
+            # that time out in the standard detector.  We store the timestamp of
+            # each new crossing; on push-off the oldest entry newer than
+            # last_step_ts is used as the retrospective heel-strike timestamp.
+            if self._acc_was_below:
+                self._hs_ring.append(ts_ms)
+                if len(self._hs_ring) > HS_RING_SIZE:
+                    self._hs_ring.pop(0)
+                self._acc_was_below = False
+        else:
+            self._acc_was_below = True
 
         # ── Push-off detection: gyr_y_hp rising above threshold (peak entry) ────
         # The phase-0.10 rebound peaks at only peak×0.05 (~9–14 dps) — below
@@ -222,16 +248,38 @@ class TerrainAwareStepDetector:
                 if self._step_count > 0:
                     self._update_cadence(elapsed_since_last)
 
+                # Option C: find oldest ring buffer entry newer than last_step_ts.
+                # This is the first acc_filt threshold crossing since the last
+                # confirmed step — the retrospective heel-strike timestamp.
+                heel_ts = ts_ms  # fallback: push-off ts if no crossing stored
+                for ring_ts in self._hs_ring:
+                    if ring_ts > self._last_step_ts_ms:
+                        heel_ts = ring_ts
+                        break
+
+                stance_ms = ts_ms - heel_ts
+
                 step_event = StepEvent(
-                    step_index   = self._step_count,
-                    ts_ms        = ts_ms,
-                    acc_peak_ms2 = self._acc_peak_this_step,
+                    step_index        = self._step_count,
+                    ts_ms             = ts_ms,
+                    acc_peak_ms2      = self._acc_peak_this_step,
+                    heel_strike_ts_ms = heel_ts,
+                    stance_duration_ms= stance_ms,
+                    swing_duration_ms = 0.0,
                 )
+
+                # Fill swing_duration of the previous step now that we know
+                # when this step's push-off fired.
+                if self._steps:
+                    prev = self._steps[-1]
+                    prev.swing_duration_ms = heel_ts - prev.ts_ms
+
                 self._steps.append(step_event)
                 self._last_step_ts_ms    = ts_ms
                 self._step_count        += 1
                 self._acc_above          = False
                 self._acc_peak_this_step = 0.0
+                self._hs_ring.clear()
 
             self._in_pushoff = False
 

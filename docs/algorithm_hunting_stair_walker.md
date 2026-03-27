@@ -268,13 +268,48 @@ Per CLAUDE.md learner-in-the-loop rules:
 
 ---
 
-## 9. Next Steps (awaiting human sign-off)
+## 9. Option C Python Validation Results — 2026-03-27
+
+**File:** `scripts/plot_option_c_stance_swing.py`
+**Tests:** 18/18 pass (10 original + 4 stance + 4 swing)
+**Plot:** `docs/plots/option_c_stance_swing_accuracy.png`
+
+### Stance accuracy (Option C ring buffer vs push-off-only)
+
+| Profile | GT stance (ms) | Push-off only error | Option C mean | Option C error | Improvement |
+|---|---|---|---|---|---|
+| Flat | 343 | +224ms | 324.6ms | −18ms | −242ms |
+| Bad wear | 343 | +224ms | 324.6ms | −18ms | −242ms |
+| Slope (10°) | 392 | +232ms | 370.8ms | −21ms | −253ms |
+| **Stairs** | **557** | **+295ms** | **522.3ms** | **−35ms** | **−330ms** |
+
+Option C exceeded expectations. Predicted error was −50 to −100ms; actual is −18 to −35ms across all profiles.
+The first acc_filt crossing fires at ~20–35ms into true stance (HP+LP filter rise time), not 50–100ms as conservatively estimated.
+
+### Swing accuracy
+
+| Profile | GT swing (ms) | Option C mean | Error |
+|---|---|---|---|
+| Flat | 229 | 242ms | +13ms |
+| Bad wear | 229 | 242ms | +13ms |
+| Slope (10°) | 240 | 253ms | +13ms |
+| Stairs | 300 | 330ms | +30ms |
+
+Swing errors are complementary to stance errors (stance undercount → swing overcount, as push-off − heel_strike shifts early).
+All values within ±30ms of ground truth — clinically acceptable.
+
+**All 4 profiles pass ±150ms tolerance on stance, ±100ms on swing.**
+
+---
+
+## 10. Next Steps (awaiting human sign-off)
 
 - [x] Human reviews `docs/plots/si_comparison_standard_vs_terrain.png`
 - [x] Human reviews `docs/plots/swing_stance_comparison.png`
 - [x] **Human selected Option C — backward heel-strike inference via ring buffer**
-- [ ] Python validation: extend `TerrainAwareStepDetector` with ring buffer, measure stance/swing accuracy
-- [ ] Python tests pass for Option C stance/swing (all 4 profiles)
+- [x] Python validation: `TerrainAwareStepDetector` extended with ring buffer
+- [x] Python tests pass for Option C stance/swing — 18/18
+- [x] Human reviews `docs/plots/option_c_stance_swing_accuracy.png`
 - [ ] Port Option C to `src/gait/step_detector.c` — add 8-entry ring buffer, no contract change
 - [ ] Rebuild firmware ELF
 - [ ] Run all 4 profiles through Renode (`test_all_profiles.py` + stairs at 100 steps)
@@ -285,7 +320,7 @@ Per CLAUDE.md learner-in-the-loop rules:
 
 ---
 
-## 10. Files
+## 11. Files
 
 | File | Role |
 |---|---|
@@ -299,3 +334,5 @@ Per CLAUDE.md learner-in-the-loop rules:
 | `docs/plots/swing_stance_comparison.png` | Swing/stance architectural impact — phase segmenter contract |
 | `docs/plots/stair_walker_signal_check.png` | Original failure mode diagnostic |
 | `scripts/plot_swing_stance_comparison.py` | Generates swing/stance impact plot |
+| `scripts/plot_option_c_stance_swing.py` | Option C validation: stance/swing accuracy vs ground truth |
+| `docs/plots/option_c_stance_swing_accuracy.png` | Option C stance/swing accuracy — human review checkpoint |

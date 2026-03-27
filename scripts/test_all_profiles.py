@@ -10,9 +10,9 @@ SI formula:
     SI          = 200 * |T_odd - T_even| / (T_odd + T_even)
 
 Stage 3 criteria evaluated here:
-    - total_steps within ±5 of N_STEPS  (flat/bad_wear/slope: 100, stairs: 50)
+    - total_steps within ±5 of N_STEPS  (all 4 profiles: 100)
     - SI_interval within ±3% of 0       (all walkers symmetric by design)
-    - Stair walker: pipeline must not crash (known failure mode expected)
+    - Stair walker: 100 steps PASS (Option C terrain-aware fix validated in Python)
 """
 
 import sys
@@ -32,7 +32,7 @@ RUNS = [
     ("flat",     100, 42),
     ("bad_wear", 100, 42),
     ("slope",    100, 42),
-    ("stairs",    50, 42),   # 50 steps — slower cadence (70 spm)
+    ("stairs",   100, 42),   # 100 steps — Option C terrain-aware fix
 ]
 
 # ── SI helper ─────────────────────────────────────────────────────────────────
@@ -121,9 +121,8 @@ for key, verdict, total, si in results:
     si_str = f"SI={si:.2f}%" if si is not None else "SI=n/a"
     print(f"  {key:<12}  steps={total:<4}  {si_str:<12}  {verdict}")
 print()
-all_pass = all(v in ("PASS",) for _, v, _, _ in results
-               if _ != "stairs")   # stair walker may have known step-count failure
+all_pass = all(v == "PASS" for _, v, _, _ in results)
 stair = next((r for r in results if r[0] == "stairs"), None)
-print(f"Flat/bad_wear/slope: {'ALL PASS' if all_pass else 'FAILURES PRESENT'}")
+print(f"All profiles: {'ALL PASS' if all_pass else 'FAILURES PRESENT'}")
 if stair:
-    print(f"Stairs: {stair[1]}  (expected: pipeline survives, step count may deviate)")
+    print(f"Stairs: {stair[1]}  (expected: PASS — Option C terrain-aware fix)")

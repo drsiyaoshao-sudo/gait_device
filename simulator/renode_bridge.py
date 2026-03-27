@@ -73,7 +73,7 @@ _TELNET_PORT = 1234
 
 # Timeouts (seconds)
 _BOOT_TIMEOUT_S      = 10.0   # wait for Renode to start and firmware to boot
-_SESSION_TIMEOUT_S   = 120.0  # max time to wait for SESSION_END in UART log
+_SESSION_TIMEOUT_S   = 200.0  # max time to wait for SESSION_END in UART log
 _POLL_INTERVAL_S     = 0.2    # how often to check UART log for completion
 
 
