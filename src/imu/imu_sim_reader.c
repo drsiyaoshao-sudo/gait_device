@@ -84,6 +84,12 @@ int imu_reader_get(imu_sample_t *out)
     out->gyr_z = vals[5];
     out->ts_ms = k_uptime_get_32();
 
+    /* Acknowledge: advance stub to next sample BEFORE any printk call.
+     * Post-kernel printk blocks on tx_done_sem (UART ISR must fire).
+     * ACK must complete first so imu_thread index advances even if
+     * the UART interrupt fix is not yet effective. */
+    _sim[SIM_OFF_ACK] = 1;
+
     /* Debug: print raw az bits for first 5 samples to check stub data */
     {
         static int _dbg_cnt = 0;
@@ -96,9 +102,6 @@ int imu_reader_get(imu_sample_t *out)
             _dbg_cnt++;
         }
     }
-
-    /* Acknowledge: advance stub to next sample. */
-    _sim[SIM_OFF_ACK] = 1;
 
     return 0;
 }

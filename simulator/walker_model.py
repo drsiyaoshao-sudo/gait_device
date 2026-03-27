@@ -234,6 +234,15 @@ def _generate_step(
         elif phase < 0.18:
             rebound_phase = (phase - 0.10) / 0.08
             gyr[i, 1] = profile.peak_angvel_dps * 0.05 * math.sin(math.pi * rebound_phase)
+        elif phase < 0.75:
+            # Ankle rocker 2: continuous dorsiflexion as body rolls over planted foot.
+            # gyr_y ramps from 0 (phase 0.18) to -(peak * 0.20) at phase 0.72, then
+            # holds to 0.75 — giving > 20 ms of gyr_y < −10 dps overlapping with
+            # the acc_z decrease (peaks at phase ~0.71) that triggers MID_STANCE→TERMINAL.
+            # Derived: walking_speed → peak_angvel_dps → 20 % of push-off peak
+            # ≈ −37 dps for flat walker (185 dps peak), well above the −10 dps gate.
+            r = min((phase - 0.18) / (0.72 - 0.18), 1.0)
+            gyr[i, 1] = -profile.peak_angvel_dps * 0.20 * r
         elif phase > 0.75:
             push_phase = (phase - 0.75) / 0.25
             gyr[i, 1] = profile.peak_angvel_dps * math.sin(math.pi * push_phase)

@@ -89,6 +89,14 @@ static void emit_snapshot(const step_record_t *last_rec)
             snap.si_swing_x10   / 10.0,
             snap.mean_cadence_x10 / 10.0);
 
+    /* printk mirror: LOG_INF is disabled in sim config (CONFIG_LOG=n).
+     * UART parser expects: SNAPSHOT step=N si_stance=X.Y% si_swing=A.B% cadence=Z spm */
+    printk("SNAPSHOT step=%u si_stance=%u.%u%% si_swing=%u.%u%% cadence=%u spm\n",
+           snap.anchor_step_index,
+           snap.si_stance_x10 / 10u, snap.si_stance_x10 % 10u,
+           snap.si_swing_x10  / 10u, snap.si_swing_x10  % 10u,
+           snap.mean_cadence_x10 / 10u);
+
     if (snap_cb) snap_cb(&snap);
 }
 

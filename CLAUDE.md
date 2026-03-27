@@ -127,6 +127,54 @@ Walker Profile
 
 ---
 
+## Renode Test Script Template
+
+All Stage 3 Renode simulation tests use a single template to ensure the MCU setup, UART capture, and result parsing infrastructure never diverges between tests. Only the signal generation section changes.
+
+### Template location
+`scripts/renode_test_template.py` — copy and rename for each new test.
+
+### Module structure (what changes vs. what is invariant)
+
+```
+scripts/renode_test_template.py
+├── Section 1 — MCU Platform         INVARIANT  nRF52840, sim_imu_stub, sim_uart_stub
+├── Section 2 — Signal Generation    REPLACE    generate_signal() → (N,6) float32
+├── Section 3 — Bridge Execution     INVARIANT  RenoneBridge.run(samples)
+├── Section 4 — UART Result Parsing  INVARIANT  signal_analysis typed events
+└── Section 5 — Assertions           REPLACE    check_results() pass/fail criteria
+```
+
+**Rule**: When adding a new walker profile, failure mode, or edge case test, copy the template and replace Sections 2 and 5 only. Sections 1, 3, 4 are identical across all tests and must not be modified per test.
+
+### Signal generation interface contract
+```python
+def generate_signal() -> np.ndarray:
+    # Must return: shape (N, 6), dtype float32
+    # Columns: [ax, ay, az, gx, gy, gz]
+    # Units: m/s² for accel, dps for gyro
+    # Rate: 208 Hz (ODR_HZ constant)
+    # Note: bridge prepends 450 stationary samples automatically
+```
+
+### Invariant infrastructure (Sections 1 + 3 + 4)
+
+| Component | File | Role |
+|---|---|---|
+| MCU platform | `nrf52840.repl` (Renode built-in) | Cortex-M4F, SRAM, Flash, NVIC, UARTE0, TWIM0 |
+| IMU stub | `renode/sim_imu_stub.py` | LSM6DS3TR-C I2C emulation @ 0x400B0000; file-based index |
+| UART stub | `renode/sim_uart_stub.py` | Replaces uart0 @ 0x40002000; TXSTOPPED fix (reads=1); DMA byte capture via `self.GetMachine().SystemBus.ReadByte()` |
+| Bridge | `simulator/renode_bridge.py` | Orchestrates two-REPL setup, ELF load, RunFor, sentinel polling |
+| Parser | `simulator/signal_analysis.py` | Parses STEP/SNAPSHOT/SESSION_END typed events |
+
+### Existing tests using the template pattern
+| Script | Section 2 (signal) | Section 5 (assertion) |
+|---|---|---|
+| `scripts/test_sine_wave.py` | 1.5 Hz sine on az, 10s | SESSION_END received, 0 steps |
+| `scripts/test_renode_smoke.py` | Walker 1 flat, 100 steps | steps±5, SI±3% |
+
+---
+
 ## Stage Definitions and Exit Criteria
 
 ### Stage 1 — Firmware

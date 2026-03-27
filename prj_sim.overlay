@@ -1,0 +1,13 @@
+/* Renode simulation DTS overlay.
+ * Applied only to the xiaoble_sense_sim build (via platformio.ini DTC_OVERLAY_FILE).
+ *
+ * Switches uart0 from "nordic,nrf-uarte" (EasyDMA) to "nordic,nrf-uart" (legacy,
+ * no DMA). The legacy driver writes directly to the TXD register without
+ * EasyDMA or PPI, which Renode 1.16's uart0 model handles correctly.
+ * The UARTE driver's wait_tx_ready() loop waits for EVENTS_TXSTOPPED, but
+ * Renode does not set it after EasyDMA TX — causing a hang. Legacy UART avoids this.
+ */
+&uart0 {
+    compatible = "nordic,nrf-uart";
+    status = "okay";
+};

@@ -254,9 +254,11 @@ class RenoneBridge:
         self._proc:     Optional[subprocess.Popen] = None
         self._monitor:  Optional[_MonitorClient]   = None
         self._n_samples: int = 0   # set by _prepare_imu_file
-        self._tmp_repl:  Optional[str] = None       # temp REPL written by _configure_renode
+        self._tmp_repl:  Optional[str] = None       # temp REPL 1 (base + imu stub)
+        self._tmp_repl2: Optional[str] = None       # temp REPL 2 (uart stub)
         self._renode_log_path: Optional[Path] = None  # Renode stdout/stderr log
-        self._session_end_sentinel: Optional[Path] = None  # written by AddLineHook
+        self._session_end_sentinel: Optional[Path] = None  # written by sim_uart_stub
+        self._sim_failed: bool = False              # set True on exception for log retention
 
     # ── public API ──────────────────────────────────────────────────────────
 
@@ -276,11 +278,15 @@ class RenoneBridge:
         -------
         (steps, snapshots, session_ends)  — same types as gait_algorithm.run()
         """
+        self._sim_failed = False
         try:
             self._prepare_imu_file(samples)
             self._start_renode()
             self._configure_renode()
             self._wait_for_session_end()
+        except Exception:
+            self._sim_failed = True
+            raise
         finally:
             self._stop_renode()
 
@@ -304,9 +310,16 @@ class RenoneBridge:
         # Format: N × 24 bytes = N × [ax ay az gx gy gz] float32 LE
         full.astype(np.float32).tofile(str(self.imu_sim))
 
-        # Remove previous UART log so Renode creates it fresh (it rotates if
-        # the file already exists, producing .1/.2/... suffixes we can't track)
+        # Remove previous UART log so Renode creates it fresh
         self.uart_log.unlink(missing_ok=True)
+
+        # Write log/sentinel paths to config files for sim_uart_stub.py to read.
+        # IronPython cannot receive dynamic arguments; config files bridge the gap.
+        _LOG_CFG  = Path.home() / ".gait_uart_log_path.txt"
+        _SENT_CFG = Path.home() / ".gait_uart_sentinel_path.txt"
+        _LOG_CFG.write_text(str(self.uart_log))
+        sentinel = str(self.uart_log) + ".done"
+        _SENT_CFG.write_text(sentinel)
 
     def _start_renode(self):
         """Launch Renode in headless mode and wait for the monitor port."""
@@ -357,58 +370,101 @@ class RenoneBridge:
         )
 
     def _configure_renode(self):
-        """Set up the machine and execute firmware directly via monitor commands."""
+        """Set up the machine and execute firmware directly via monitor commands.
+
+        Python peripheral strategy (Strike 3 — self.GetMachine() DMA read):
+          REPL 1: nrf52840.repl base + sim_imu stub (no uart0 override)
+          Monitor: sysbus Unregister uart0  (remove built-in UARTE0 model)
+          REPL 2: sim_uart_stub.py at 0x40002000 — handles TXSTOPPED fix AND
+            DMA byte capture via self.GetMachine().SystemBus.ReadByte()
+            (self.GetMachine() is inherited IPeripheral method, works on CPU objects
+            in Renode watchpoint context — testing if it also works in PythonPeripheral)
+        """
         mon = self._monitor
 
-        # Write a temp REPL with the absolute path to the Python stub so Renode
-        # can find it regardless of CWD.  The static .repl uses a relative path
-        # that Renode 1.16 resolves inconsistently; absolute path is reliable.
-        stub_abs = (_PROJECT_ROOT / "renode/sim_imu_stub.py").resolve()
-        repl_content = (
+        imu_stub_abs  = str((_PROJECT_ROOT / "renode/sim_imu_stub.py").resolve())
+        uart_stub_abs = str((_PROJECT_ROOT / "renode/sim_uart_stub.py").resolve())
+
+        # ── REPL 1: base platform + IMU stub ──────────────────────────────────
+        repl1_content = (
             'using "platforms/cpus/nrf52840.repl"\n\n'
             'sim_imu: Python.PythonPeripheral @ sysbus 0x400B0000\n'
             '    size: 0x100\n'
-            f'    filename: "{stub_abs}"\n'
+            f'    filename: "{imu_stub_abs}"\n'
             '    initable: true\n'
         )
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".repl", delete=False
-        ) as tmp:
-            tmp.write(repl_content)
-            tmp_repl = tmp.name
-        self._tmp_repl = tmp_repl   # keep for cleanup
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".repl", delete=False) as tmp:
+            tmp.write(repl1_content)
+            self._tmp_repl = tmp.name
 
-        # Build the machine step by step (no resc) — full control, no context issues.
-        mon.send('mach create "gait_device"')
-        mon.send(f"machine LoadPlatformDescription @{tmp_repl}")
-        mon.send(f"sysbus LoadELF @{self.elf_path}")
+        # ── REPL 2: UART Python stub ───────────────────────────────────────────
+        # Note: Python.PythonPeripheral has no GPIO property (Renode 1.16), so
+        # -> nvic@2 is NOT used here.  Instead a sysbus AddWatchpointHook on
+        # TASKS_STARTTX (0x40002008) writes to NVIC_ISPR0 (0xE000E200) bit 2
+        # to pending-trigger IRQ 2 (UARTE0) after each TX, which is installed
+        # in _configure_renode() below after LoadELF.
+        repl2_content = (
+            'sim_uart: Python.PythonPeripheral @ sysbus <0x40002000, +0x1000>\n'
+            '    size: 0x1000\n'
+            f'    filename: "{uart_stub_abs}"\n'
+            '    initable: true\n'
+        )
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".repl", delete=False) as tmp:
+            tmp.write(repl2_content)
+            self._tmp_repl2 = tmp.name
 
-        # Attach UART file backend for persistent log (flushed on Renode close).
-        # Must use @path syntax (no quotes) — Renode 1.16 doesn't accept quoted paths.
-        mon.send(f"uart0 CreateFileBackend @{self.uart_log}")
+        # ── Machine setup ──────────────────────────────────────────────────────
+        r = mon.send('mach create "gait_device"')
+        print(f"[Renode] mach create          : {r.strip()!r}")
 
-        # Add a line hook that writes a sentinel file the instant SESSION_END appears
-        # in the UART output — avoids polling a file that Renode only flushes on exit.
+        r = mon.send(f"machine LoadPlatformDescription @{self._tmp_repl}")
+        print(f"[Renode] LoadPlatformDesc (1) : {r.strip()!r}")
+        if "error" in r.lower() or "exception" in r.lower():
+            raise RuntimeError(f"REPL 1 load failed: {r.strip()}")
+
+        r = mon.send("sysbus Unregister uart0")
+        print(f"[Renode] Unregister uart0     : {r.strip()!r}")
+
+        r = mon.send(f"machine LoadPlatformDescription @{self._tmp_repl2}")
+        print(f"[Renode] LoadPlatformDesc (2) : {r.strip()!r}")
+        if "error" in r.lower() or "exception" in r.lower():
+            raise RuntimeError(f"REPL 2 (uart stub) load failed: {r.strip()}")
+
+        r = mon.send(f"sysbus LoadELF @{self.elf_path}", timeout=60.0)
+        print(f"[Renode] LoadELF              : {r.strip()!r}")
+        if "error" in r.lower() or "exception" in r.lower():
+            raise RuntimeError(f"ELF load failed: {r.strip()}")
+
+        # UART interrupt fix: fire UARTE0 IRQ (IRQ 2) on every TASKS_STARTTX write.
+        # Python.PythonPeripheral has no GPIO (cannot use -> nvic@2 in REPL).
+        # Watchpoint on TASKS_STARTTX (0x40002008) writes to NVIC_ISPR0 bit 2
+        # (0xE000E200 = 0x4) to set IRQ 2 pending. The NVIC then fires IRQ 2
+        # (UARTE0 ISR), which calls k_sem_give(tx_done_sem) so Zephyr post-kernel
+        # uart_poll_out() unblocks.  Our stub returns 1 for EVENTS_ENDTX reads so
+        # the ISR correctly signals TX completion.
+        # Width=4 (32-bit), access=2 (Write).
+        wp_hook = (
+            "self.GetMachine().SystemBus.WriteDoubleWord(0xE000E200, 4)"
+        )
+        r = mon.send(f'sysbus AddWatchpointHook 0x40002008 4 2 "{wp_hook}"')
+        print(f"[Renode] WatchpointHook UART  : {r.strip()!r}")
+
+        # Sentinel: sim_uart_stub.py writes this when SESSION_END is detected.
         sentinel = str(self.uart_log) + ".done"
         self._session_end_sentinel = Path(sentinel)
         self._session_end_sentinel.unlink(missing_ok=True)
-        # IronPython one-liner: open/write the sentinel file
-        hook_script = f"open('{sentinel}', 'w').write('done')"
-        mon.send(f'uart0 AddLineHook "SESSION_END" "{hook_script}"')
 
-        # Allow firmware to boot (1.5 s simulated) then a settling period.
-        mon.send("emulation RunFor \"1.5\"")
-        mon.send("emulation RunFor \"0.1\"")
+        # Boot the firmware (1.5 s simulated) then a short settling period.
+        r = mon.send('emulation RunFor "1.5"', timeout=60.0)
+        print(f"[Renode] RunFor 1.5s (boot)   : {r.strip()!r}")
+        r = mon.send('emulation RunFor "0.1"', timeout=30.0)
+        print(f"[Renode] RunFor 0.1s (settle) : {r.strip()!r}")
 
     def _wait_for_session_end(self):
-        """
-        Advance simulated time until all IMU samples are served and SESSION_END
-        appears in the UART log.
-
-        Advance simulated time until SESSION_END appears.
+        """Advance simulated time until SESSION_END appears in the UART log.
 
         The firmware auto-starts the session and auto-stops when the IMU stub
-        runs out of samples.  AddLineHook writes a sentinel file the instant
+        runs out of samples. sim_uart_stub.py writes a sentinel file the instant
         SESSION_END appears in UART output — we poll that file (real-time).
         """
         mon = self._monitor
@@ -426,7 +482,6 @@ class RenoneBridge:
         while time.monotonic() < deadline:
             mon.send(f"emulation RunFor \"{chunk_s}\"")
             elapsed_s += chunk_s
-            # Check sentinel written by AddLineHook (real-time, no flush needed)
             if sentinel and sentinel.exists():
                 return
             time.sleep(_POLL_INTERVAL_S)
@@ -459,19 +514,14 @@ class RenoneBridge:
                     pass
             self._proc = None
 
-        if self._tmp_repl:
-            try:
-                os.unlink(self._tmp_repl)
-            except Exception:
-                pass
-            self._tmp_repl = None
-
-        if self._renode_log_path:
-            try:
-                self._renode_log_path.unlink(missing_ok=True)
-            except Exception:
-                pass
-            self._renode_log_path = None
+        for attr in ("_tmp_repl", "_tmp_repl2"):
+            p = getattr(self, attr, None)
+            if p:
+                try:
+                    os.unlink(p)
+                except Exception:
+                    pass
+                setattr(self, attr, None)
 
         if self._session_end_sentinel:
             try:
@@ -479,6 +529,21 @@ class RenoneBridge:
             except Exception:
                 pass
             self._session_end_sentinel = None
+
+        if self._renode_log_path:
+            if self._sim_failed and self._renode_log_path.exists():
+                # Print tail of Renode log so the failure is diagnosable
+                try:
+                    tail = self._renode_log_path.read_text(errors="replace")[-2000:]
+                    print(f"\n[Renode log tail]\n{tail}\n[/Renode log]")
+                except Exception:
+                    pass
+            try:
+                self._renode_log_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            self._renode_log_path = None
+
 
     def _parse_uart_log(
         self,
