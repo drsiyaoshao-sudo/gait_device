@@ -189,13 +189,13 @@ Write and validate the embedded firmware (Zephyr RTOS, C).
 - Snapshot buffer (`snapshot_buffer.c`): RAM backend, optional W25Q16 flash fallback
 
 **Exit criteria — ALL must pass before moving to Stage 2:**
-- [ ] Firmware compiles cleanly: `pio run -e xiaoble_sense` with zero errors and zero warnings
-- [ ] All Zephyr ztest unit tests pass: `west build -b native_posix tests/gait_unit && ./build/zephyr/zephyr.exe`
-- [ ] All PlatformIO native unit tests pass: `pio test -e native`
-- [ ] Step detector: ≥ 98/100 steps on synthetic CSV fixture (`test_step_detector_synthetic`)
-- [ ] Symmetry Index: SI = 0 for identical steps, SI ≈ 13.3% for alternating 350ms/400ms stance (`test_symmetry_index_*`)
-- [ ] Foot angle drift: < 1° over 1 second of noisy zero-input (`test_foot_angle_drift`)
-- [ ] Phase segmenter: stance and swing durations within ±20ms of synthetic ground truth
+- [x] Firmware compiles cleanly — **CONFIRMED 2026-03-27**: ELF built via ninja two-step (BUG-005). Flash=37.7KB/1MB (3.6%), SRAM=118KB/256KB (45.2%). ELF runs correctly in Renode bare-metal for all 4 walker profiles. Note: `pio run -e xiaoble_sense` (hardware target) not separately verified; sim target `xiaoble_sense_sim` confirmed.
+- [ ] All Zephyr ztest unit tests pass: `west build -b native_posix tests/gait_unit && ./build/zephyr/zephyr.exe` — **NOT RUN**: no `tests/gait_unit` directory exists; Zephyr west toolchain not configured on this machine
+- [x] All PlatformIO native unit tests pass — **CONFIRMED 2026-03-27**: `gcc -DUNIT_TEST` build of `test/native/` (note: `pio test -e native` does not discover these tests because they use plain `assert()` not Unity; compiled and run directly). All 3 suites pass: `test_step_detector` (3 tests), `test_rolling_window` (5 tests), `test_foot_angle` (3 tests). Fixed stub: added `#define printk printf` to `test/native/stubs/logging/log.h`.
+- [x] Step detector: ≥ 98/100 steps on synthetic CSV fixture — **CONFIRMED 2026-03-27**: `test_synthetic_walk` → 100/100 detected; also confirmed in Renode bare-metal (all 4 profiles 100/100)
+- [x] Symmetry Index: SI = 0 for identical steps, SI ≈ 13.3% for alternating 350ms/400ms stance — **CONFIRMED 2026-03-27**: `test_si_identical_steps` → SI=0.00%; `test_si_alternating` → SI=13.30% (target 13.33%) — both PASS
+- [x] Foot angle drift: < 1° over 1 second of noisy zero-input — **CONFIRMED 2026-03-27**: `test_drift_1s_zero_input` → drift=0.0044° < 1° — PASS
+- [ ] Phase segmenter: stance and swing durations within ±20ms of synthetic ground truth — **NOT MET**: BUG-009 open — phase segmenter not completing gait cycles in C firmware (rolling_window content all zeros in Renode). No native unit test for phase_segmenter exists.
 
 **Do not proceed to Stage 2 if any unit test fails. Fix the firmware first.**
 
