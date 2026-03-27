@@ -236,13 +236,13 @@ Run the actual firmware ELF inside Renode against synthetic walker inputs. Firmw
 **Exit criteria — ALL must pass before moving to Stage 4:**
 - [ ] `pio run -t simulate` completes without Renode crash or assertion fault
 - [ ] Robot Framework suite passes: `robot renode/robot/gait_test.robot`
-- [ ] 100-step synthetic walk: `total_steps` in UART output within ±5 of 100 for 3 non-failure mode walkers (Flat surface, Bad wearer, Slope)
-- [ ] SI detection: firmware-detected SI within ±3% of ground truth for all 3 non-failure mode walkers (Flat surface, Bad wearer, Slope)
+- [x] 100-step synthetic walk: `total_steps` in UART output within ±5 of 100 for 3 non-failure mode walkers — **CONFIRMED 2026-03-27** via `test_all_profiles.py` (Renode, bare-metal): Flat 100/100, Bad wear 100/100, Slope 100/100
+- [x] SI detection: firmware-detected SI within ±3% of ground truth for all 3 non-failure mode walkers — **CONFIRMED 2026-03-27**: Flat SI=0.04%, Bad wear SI=0.04%, Slope SI=0.84% — all well within 3%
 - [x] Stair walker: **BUG-010 RESOLVED 2026-03-27** — Option C terrain-aware detector. Original firmware: 0/100 steps. Option C firmware: 100/100 steps, SI=0.41% in bare-metal Cortex-M4F simulation. See `docs/algorithm_hunting_stair_walker.md` for full hunting procedure and `src/gait/step_detector.c` for C implementation.
-- [ ] Rolling window: snapshots written every 10 steps, 200-step window fills correctly at session start
+- [ ] Rolling window: snapshots written every 10 steps, 200-step window fills correctly at session start — blocked by BUG-008 (emit_snapshot uses LOG_INF, suppressed) and BUG-009 (walker model gyr_y gap, phase segmenter stuck)
 - [ ] BLE export simulation: all snapshot structs transferred and unpacked without CRC or length error
 - [ ] Power model: simulated FIFO idle interval ≈ 154ms (32 samples / 208 Hz); verify via UART timestamps
-- [ ] Power consumption, RAM usage, MCU clock speed are in the budget of the proposed device
+- [ ] Power consumption, RAM usage, MCU clock speed are in the budget of the proposed device — **partial**: Flash=37.7KB/1MB (3.6%), SRAM=118KB/256KB (45.2%) confirmed from build output; power and clock not yet verified via simulation
 
 **Do not proceed to Stage 4 if Robot Framework suite fails or SI accuracy is outside tolerance.**
 
