@@ -226,6 +226,30 @@ The period accuracy confirms the algorithm is detecting the right events — the
 
 **Option C is the lowest-risk path.** The rejected acc peaks (427 of them for stairs) are already computed — we just don't store their timestamps. A small ring buffer would recover the heel-strike timing for the phase segmenter without changing the event contract or adding a terrain classifier.
 
+### Option C Selected — 2026-03-27
+
+**Decision rationale:**
+- Rejected acc peaks (427 for 100 stair steps) are already computed by the existing filter chain — timestamps not stored today but the data exists
+- Ring buffer of 8 entries (~32 bytes RAM) stores each acc_filt threshold crossing timestamp since the last confirmed step
+- When push-off fires, the oldest ring buffer entry since the last confirmed step is used as the retrospective heel-strike timestamp
+- No event contract change, no terrain classifier, no new event types
+- Phase segmenter `on_heel_strike()` receives a physically meaningful timestamp (early stance loading) rather than push-off time or nothing
+
+**Accuracy expectation for stairs:**
+
+| What fires `on_heel_strike` | Computed stance | Actual stance | Error |
+|---|---|---|---|
+| Push-off (current wrong state) | 852ms | 557ms | +295ms |
+| First acc crossing, Option C | ~450–510ms | 557ms | −50 to −100ms |
+| True toe-strike (ideal) | 557ms | 557ms | 0ms |
+
+Option C does not achieve ±20ms. The HP+LP filter response to the slow stair sigmoid loading means the first acc_filt threshold crossing is 50–100ms into actual stance, not at true foot contact. This is accepted: −50 to −100ms error on stairs is clinically manageable; +295ms is not.
+
+**Ring buffer implementation rule:**
+On each push-off detection, select the **oldest ring buffer entry with timestamp newer than `last_step_ts`**. This prevents entries from the previous step's push-off tail contaminating the current step's heel-strike inference.
+
+**Next action:** Python validation of Option C stance/swing accuracy before any C port.
+
 ### What Must NOT Be Done
 
 Do not simply swap `step_detector.c` for `TerrainAwareStepDetector` and call `on_heel_strike()` at push-off time. This silently corrupts all phase segmenter output (stance/swing durations, foot angle at initial contact, cadence calculation) across all four terrains, not just stairs. The SI output would still look correct (because SI uses intervals), masking the corruption.
@@ -246,10 +270,12 @@ Per CLAUDE.md learner-in-the-loop rules:
 
 ## 9. Next Steps (awaiting human sign-off)
 
-- [ ] Human reviews `docs/plots/si_comparison_standard_vs_terrain.png`
-- [ ] Human reviews `docs/plots/swing_stance_comparison.png`
-- [ ] **Human selects C port option: A (two-event), B (SI-only mode), or C (backward inference)**
-- [ ] Implement selected option in `src/gait/step_detector.c` (and `phase_segmenter.c` if Option A)
+- [x] Human reviews `docs/plots/si_comparison_standard_vs_terrain.png`
+- [x] Human reviews `docs/plots/swing_stance_comparison.png`
+- [x] **Human selected Option C — backward heel-strike inference via ring buffer**
+- [ ] Python validation: extend `TerrainAwareStepDetector` with ring buffer, measure stance/swing accuracy
+- [ ] Python tests pass for Option C stance/swing (all 4 profiles)
+- [ ] Port Option C to `src/gait/step_detector.c` — add 8-entry ring buffer, no contract change
 - [ ] Rebuild firmware ELF
 - [ ] Run all 4 profiles through Renode (`test_all_profiles.py` + stairs at 100 steps)
 - [ ] Confirm stairs ≥ 95/100 steps and SI < 3% in bare-metal simulation
