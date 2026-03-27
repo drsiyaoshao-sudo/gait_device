@@ -24,7 +24,10 @@ static void on_heel_strike(const heel_strike_t *hs)
 
 static void on_step_record(const step_record_t *rec)
 {
-    rolling_window_add_step(rec);
+    step_record_t r = *rec;
+    float cad = step_detector_cadence_spm();
+    r.cadence_spm = (cad > 255.0f) ? 255u : (uint8_t)cad;
+    rolling_window_add_step(&r);
 }
 
 /* ------------------------------------------------------------------ */

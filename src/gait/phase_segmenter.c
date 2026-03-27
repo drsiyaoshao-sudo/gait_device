@@ -1,7 +1,6 @@
 #include "phase_segmenter.h"
 #include <stdbool.h>
 #include "foot_angle.h"
-#include <stdbool.h>
 #include "step_detector.h"
 #include <math.h>
 #include <string.h>
@@ -9,11 +8,17 @@
 
 LOG_MODULE_REGISTER(phase_seg, LOG_LEVEL_DBG);
 
+
 /* ------------------------------------------------------------------ */
 /* Thresholds                                                           */
 /* ------------------------------------------------------------------ */
 #define ACC_MID_STANCE_FRAC     0.85f   /* acc_z > 0.85 * 9.81 */
-#define ACC_MAG_HP_MID_THRESH   2.94f   /* ~0.3g in m/s² */
+#define GYR_LOADING_TO_MID_DPS  20.0f   /* foot-flat gate: heel-strike impact peak
+                                          * decays from ~37-60 dps to near zero in
+                                          * ~100ms; early ankle rocker ≈10-13 dps.
+                                          * 20 dps bisects them. Terrain-agnostic:
+                                          * works for flat, slope, and stairs where
+                                          * acc_mag >> g at mid-stance. */
 #define GYR_MID_TO_TERM_DPS     (-10.0f)
 #define ACC_Z_DERIV_WIN_MS      20
 #define PUSH_OFF_GYR_DEFAULT    80.0f   /* dps — foot departing ground */
@@ -95,6 +100,9 @@ void phase_segmenter_init(step_record_cb_t cb)
     ps.first_step    = true;
     ps.pushoff_thresh = PUSH_OFF_GYR_DEFAULT;
     for (int i = 0; i < 4; i++) ps.pushoff_thresh_history[i] = PUSH_OFF_GYR_DEFAULT;
+    /* Seed LP filter at gravity baseline so the first real sample does not
+     * see a cold-start transient (acc_z_lp = 0.5×0 + 0.5×acc_z → wrong). */
+    ps.acc_z_lp_prev = 9.81f;
 }
 
 void phase_segmenter_reset(void)
@@ -129,7 +137,6 @@ void phase_segmenter_on_heel_strike(const heel_strike_t *hs)
 void phase_segmenter_update(const imu_sample_t *s)
 {
     float acc_z   = s->acc_z;
-    float acc_mag = sqrtf(s->acc_x*s->acc_x + s->acc_y*s->acc_y + acc_z*acc_z);
     float gyr_y   = s->gyr_y;
 
     /* Low-pass acc_z for mid-stance check.
@@ -148,8 +155,9 @@ void phase_segmenter_update(const imu_sample_t *s)
     switch (ps.phase) {
 
     case PHASE_LOADING:
-        /* Wait for stable ground contact */
-        if (acc_z_lp > (0.85f * 9.81f) && fabsf(acc_mag - 9.81f) < ACC_MAG_HP_MID_THRESH) {
+        /* Foot-flat detection: weight-bearing AND impact transient decayed.
+         * |gyr_y| passes through near-zero after heel-strike arrest on all terrain. */
+        if (acc_z_lp > (0.85f * 9.81f) && fabsf(gyr_y) < GYR_LOADING_TO_MID_DPS) {
             transition(PHASE_MID_STANCE, s->ts_ms);
         }
         break;

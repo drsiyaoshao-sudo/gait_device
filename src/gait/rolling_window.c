@@ -83,14 +83,7 @@ static void emit_snapshot(const step_record_t *last_rec)
         .flags              = (uint8_t)(is_running ? 0x02 : 0x01),
     };
 
-    LOG_INF("SNAPSHOT step=%u si_stance=%.1f%% si_swing=%.1f%% cadence=%.0f spm",
-            snap.anchor_step_index,
-            snap.si_stance_x10  / 10.0,
-            snap.si_swing_x10   / 10.0,
-            snap.mean_cadence_x10 / 10.0);
-
-    /* printk mirror: LOG_INF is disabled in sim config (CONFIG_LOG=n).
-     * UART parser expects: SNAPSHOT step=N si_stance=X.Y% si_swing=A.B% cadence=Z spm */
+    /* UART parser expects: SNAPSHOT step=N si_stance=X.Y% si_swing=A.B% cadence=Z spm */
     printk("SNAPSHOT step=%u si_stance=%u.%u%% si_swing=%u.%u%% cadence=%u spm\n",
            snap.anchor_step_index,
            snap.si_stance_x10 / 10u, snap.si_stance_x10 % 10u,
@@ -98,6 +91,39 @@ static void emit_snapshot(const step_record_t *last_rec)
            snap.mean_cadence_x10 / 10u);
 
     if (snap_cb) snap_cb(&snap);
+}
+
+/* ------------------------------------------------------------------ */
+/* Flat-walker prior — CNN "same" padding for the step domain          */
+/* Pre-fill the window with PRIOR_STEPS synthetic flat-walk records    */
+/* so the first real snapshot has a neutral 0% SI baseline instead of  */
+/* the convolution artefact from ring-buffer ghost heel-strikes.       */
+/* Priors are evicted naturally as real steps fill the circular buffer. */
+/* ------------------------------------------------------------------ */
+#define PRIOR_STEPS       (SNAPSHOT_INTERVAL - 1)  /* 9: one less than first snap */
+
+/* Derived from canonical flat walk (cadence=105 spm, 60/40 stance/swing split):
+ *   step_period = 60000 / 105 = 571 ms
+ *   stance      = 0.60 × 571  = 343 ms
+ *   swing       = 0.40 × 571  = 229 ms                                         */
+#define PRIOR_STANCE_MS   343u
+#define PRIOR_SWING_MS    229u
+#define PRIOR_CADENCE_SPM 105u
+
+static void seed_prior(void)
+{
+    for (int i = 0; i < PRIOR_STEPS; i++) {
+        step_record_t r;
+        memset(&r, 0, sizeof(r));
+        r.step_index         = (uint32_t)i;
+        r.stance_duration_ms = PRIOR_STANCE_MS;
+        r.swing_duration_ms  = PRIOR_SWING_MS;
+        r.step_duration_ms   = PRIOR_STANCE_MS + PRIOR_SWING_MS;
+        r.cadence_spm        = PRIOR_CADENCE_SPM;
+        r.flags              = 0x01;   /* valid */
+        window[i] = r;
+    }
+    win_count = PRIOR_STEPS;
 }
 
 /* ------------------------------------------------------------------ */
@@ -110,6 +136,7 @@ void rolling_window_init(snapshot_cb_t cb)
     win_count  = 0;
     total_steps = 0;
     snap_cb    = cb;
+    seed_prior();
 }
 
 void rolling_window_reset(void)
