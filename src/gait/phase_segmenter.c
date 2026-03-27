@@ -132,8 +132,13 @@ void phase_segmenter_update(const imu_sample_t *s)
     float acc_mag = sqrtf(s->acc_x*s->acc_x + s->acc_y*s->acc_y + acc_z*acc_z);
     float gyr_y   = s->gyr_y;
 
-    /* Low-pass acc_z for mid-stance check */
-    float acc_z_lp = 0.9f * ps.acc_z_lp_prev + 0.1f * acc_z;
+    /* Low-pass acc_z for mid-stance check.
+     * alpha=0.5 (lag≈5ms) chosen over 0.1 (lag≈43ms): the slower filter peaks
+     * during push-off (phase 0.84) where gyr_y is positive, making the
+     * MID_STANCE→TERMINAL condition (acc_z_lp < prev AND gyr_y < -10) unsatisfiable.
+     * At alpha=0.5 the filter peaks at phase 0.728, giving a 7.5ms overlap window
+     * where both conditions hold before push-off begins at phase 0.75. */
+    float acc_z_lp = 0.5f * ps.acc_z_lp_prev + 0.5f * acc_z;
 
     /* Track peak |gyr_y| during current step for push-off detection */
     if (fabsf(gyr_y) > fabsf((float)ps.cur.peak_ang_vel_dps)) {
@@ -160,7 +165,7 @@ void phase_segmenter_update(const imu_sample_t *s)
         if (acc_z_lp < ps.acc_z_lp_prev && gyr_y < GYR_MID_TO_TERM_DPS) {
             if (ps.acc_z_neg_deriv_start_ts == 0) {
                 ps.acc_z_neg_deriv_start_ts = s->ts_ms;
-            } else if ((s->ts_ms - ps.acc_z_neg_deriv_start_ts) >= 20) {
+            } else if ((s->ts_ms - ps.acc_z_neg_deriv_start_ts) >= 5) {
                 ps.acc_z_neg_deriv_start_ts = 0;
                 transition(PHASE_TERMINAL, s->ts_ms);
             }

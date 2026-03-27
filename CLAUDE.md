@@ -348,3 +348,59 @@ All future effects must still be expressible as perturbations to the three primi
 8. **Algorithm patches must be honest about failures.** If a search domain (e.g., "Filtering") is not yielding results, the agent must inform the human and suggest stopping.The agent will suggest new domains (e.g., "Feature Extraction" or "Hardware Change") and ask the human to select **exactly one** to pursue. Always maintain the option for hardware iteration (sensor repositioning, BOM changes). We are solving a failure mode, not developing "beautiful" but fragile algorithms.
 
 9. **BOM optimization** If an algorithm can be implemented with lower-budget hardware/software compared against the sample BOMs (hw_bom.md and sw.bom_md), the agent must explicitly state so and the reasons (e.g., "Lower clock speed," "Reduced sampling rate") in the console. The human determines whether to optimize the BOM. Accepted BOM changes must be documented in CLAUDE.md for full traceability between logic and cost.
+
+---
+
+## Learner-in-the-Loop: Signal Plotting for Simulator Efficacy Review
+
+The agent must generate signal plots at key simulation milestones so the human can visually confirm the walker model is physically plausible before trusting the SI output. Plots are the primary tool for catching silent model errors that pass numerical tests (e.g., wrong DC baseline, missing signal morphology, phase drift).
+
+### When to plot
+
+- After any change to `walker_model.py` (new profile, new terrain primitive, ankle rocker fix, etc.)
+- After any change to a filter coefficient in `phase_segmenter.c` or `step_detector.c`
+- When a profile passes step-count criteria but SI looks suspicious
+- Before hardware handoff — plot all 4 profiles side-by-side as a final visual audit
+
+### Plot template
+
+```python
+# Standard 3-panel signal check — copy and adapt per profile
+import sys, math
+import numpy as np
+import matplotlib
+matplotlib.use("Agg")   # headless — no display required
+import matplotlib.pyplot as plt
+sys.path.insert(0, "simulator")
+from walker_model import PROFILES, generate_imu_sequence
+
+profile = PROFILES["<key>"]   # flat / bad_wear / slope / stairs
+samples = generate_imu_sequence(profile, 20, rng=np.random.default_rng(42))
+ODR = 208.0
+t = np.arange(len(samples)) / ODR
+
+fig, axes = plt.subplots(3, 1, figsize=(14, 8), sharex=True)
+# Panel 1: acc_z with expected DC baseline
+# Panel 2: acc_x with slope DC
+# Panel 3: gyr_y with MID→TERM gate at -10 dps
+plt.tight_layout()
+plt.savefig("docs/plots/<profile>_signal_check.png", dpi=150)
+```
+
+Open with: `open docs/plots/<profile>_signal_check.png`
+
+All plots are saved to `docs/plots/` for project traceability.
+
+### Slope walker signal check — confirmed 2026-03-27
+
+**Plot:** `docs/plots/slope_walker_signal_check.png`
+
+![Slope walker signal](docs/plots/slope_walker_signal_check.png)
+
+**Three observations confirmed by human review:**
+
+1. **acc_z DC reduction is correct.** Walking mean = 8.92 m/s² vs g·cos(10°) = 9.66 m/s². The −0.75 m/s² deficit comes from swing-phase samples (acc_z drops to ~2.5 m/s² during swing) pulling the per-cycle mean below the stance baseline. Correct behaviour: the DC reduction is present during stance, and calibration on hardware will see it as a persistent undercount of gravity — exactly the terrain-induced bias the algorithm cannot distinguish from horizontal acceleration.
+
+2. **acc_x DC injection is correct.** Mean ≈ 1.51 m/s² vs g·sin(10°) = 1.70 m/s²; same swing averaging deficit. The 10° slope projects a constant gravity component onto acc_x throughout the session. This is the signal that makes the standard flat-ground SI algorithm report corrupted values on slope — the key failure mode the stair/slope terrain tests exist to capture.
+
+3. **gyr_y gate is reliably crossed.** Every step shows the initial dorsiflexion dipping below −10 dps (MID→TERM gate, purple dashed line), the ankle rocker 2 ramp sustaining negative gyr_y through mid-stance, and strong push-off peaks at ~178 dps. Consistent with 18 snapshots per 100-step run and SI = 0.0% — the phase segmenter cycles correctly on slope terrain.
