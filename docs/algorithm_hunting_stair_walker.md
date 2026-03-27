@@ -166,7 +166,73 @@ Two candidate gyr_y features for push-off detection:
 
 ---
 
-## 7. Procedure Enforced
+## 7. Critical Architectural Finding — Push-Off Detection Breaks Phase Segmenter Contract
+
+**Discovered:** 2026-03-27 via `plot_swing_stance_comparison.py`
+**Severity:** Blocks direct C port of `TerrainAwareStepDetector` into existing firmware without changes to `phase_segmenter.c`
+
+### The Problem
+
+The standard detector fires `on_heel_strike()` at the **start of stance** (acc_filt peak ≈ heel contact).
+The terrain-aware detector fires at the **end of stance** (push-off burst falling edge).
+
+`phase_segmenter.c` uses `on_heel_strike()` as its clock — it starts `PHASE_LOADING` at the callback timestamp and measures `stance_duration_ms` as the elapsed time until toe-off detection. If the callback fires at push-off instead of heel-strike, the phase segmenter computes the wrong interval:
+
+```
+Current contract:
+  on_heel_strike(ts=T_hs) → PHASE_LOADING → ... → toe-off → stance = T_toeoff - T_hs
+
+With push-off detection:
+  on_heel_strike(ts=T_po[N]) → PHASE_LOADING → next push-off fires → stance = T_po[N+1] - T_po[N]
+                                                                     = swing[N] + stance[N+1]
+                                                                     ≈ full step period  ← WRONG
+```
+
+### Measured Impact
+
+Numbers from `scripts/plot_swing_stance_comparison.py`:
+
+| Profile | GT stance (ms) | GT swing (ms) | GT period (ms) | Computed "stance" if TA used | Error |
+|---|---|---|---|---|---|
+| Flat | 343 | 229 | 571 | 567 | +224ms (+65%) |
+| Bad wear | 343 | 229 | 571 | 567 | +224ms (+65%) |
+| Slope (10°) | 392 | 240 | 632 | 624 | +232ms (+59%) |
+| Stairs | 557 | 300 | 857 | 852 | +295ms (+53%) |
+
+**SI computation is unaffected** — SI uses inter-step intervals (push-off to push-off), which correctly equal the full step period regardless of which phase the detector fires at. All four profiles yield SI < 3%.
+
+**Phase segmenter output is entirely wrong** — reported stance_duration_ms would be ~1.6–1.65× the actual stance duration for all profiles. Swing duration would be near-zero or negative.
+
+### Step Period Accuracy (terrain-aware detector is faithful on timing)
+
+The detector itself is accurate — detected step periods match ground truth within 5ms:
+
+| Profile | GT period (ms) | TA detected period (ms) | Error |
+|---|---|---|---|
+| Flat | 571 | 567 | −4ms |
+| Bad wear | 571 | 567 | −4ms |
+| Slope (10°) | 632 | 624 | −8ms |
+| Stairs | 857 | 852 | −5ms |
+
+The period accuracy confirms the algorithm is detecting the right events — the issue is purely the **event contract mismatch** with `phase_segmenter.c`.
+
+### Three Options for C Port (human must select one)
+
+| Option | Description | Phase segmenter impact | Complexity |
+|---|---|---|---|
+| **A — Two-event architecture** | Add `push_off_t` event type alongside `heel_strike_t`. Step detector emits both: heel-strike detected from acc_filt peak (even if not gyro-confirmed), push-off detected from gyr_y_hp burst. Phase segmenter keeps `on_heel_strike()` contract unchanged. | None — contract preserved | Medium: new event type, dual emission |
+| **B — SI-only mode for stair terrain** | Detect terrain type (low acc_z DC, slow cadence, high vertical_osc). On stair terrain: skip phase segmenter, report SI from step intervals only. On flat/slope/bad_wear: use existing standard detector unchanged. | None on non-stair. Phase seg disabled on stair. | Medium: terrain classifier needed |
+| **C — Backward heel-strike inference** | After push-off fires, look back in a ring buffer for the most recent acc_filt timeout (rejected acc peak) and retroactively use its timestamp as the heel-strike event. Requires a small ring buffer of rejected peak timestamps. | Preserved — heel-strike timestamp is retroactively recovered | Low: 8-entry ring buffer, ~32 bytes RAM |
+
+**Option C is the lowest-risk path.** The rejected acc peaks (427 of them for stairs) are already computed — we just don't store their timestamps. A small ring buffer would recover the heel-strike timing for the phase segmenter without changing the event contract or adding a terrain classifier.
+
+### What Must NOT Be Done
+
+Do not simply swap `step_detector.c` for `TerrainAwareStepDetector` and call `on_heel_strike()` at push-off time. This silently corrupts all phase segmenter output (stance/swing durations, foot angle at initial contact, cadence calculation) across all four terrains, not just stairs. The SI output would still look correct (because SI uses intervals), masking the corruption.
+
+---
+
+## 8. Procedure Enforced
 
 Per CLAUDE.md learner-in-the-loop rules:
 
@@ -178,20 +244,22 @@ Per CLAUDE.md learner-in-the-loop rules:
 
 ---
 
-## 8. Next Steps (awaiting human sign-off)
+## 9. Next Steps (awaiting human sign-off)
 
 - [ ] Human reviews `docs/plots/si_comparison_standard_vs_terrain.png`
-- [ ] Human approves Python patch
-- [ ] Port `TerrainAwareStepDetector` logic → `src/gait/step_detector.c`
+- [ ] Human reviews `docs/plots/swing_stance_comparison.png`
+- [ ] **Human selects C port option: A (two-event), B (SI-only mode), or C (backward inference)**
+- [ ] Implement selected option in `src/gait/step_detector.c` (and `phase_segmenter.c` if Option A)
 - [ ] Rebuild firmware ELF
 - [ ] Run all 4 profiles through Renode (`test_all_profiles.py` + stairs at 100 steps)
 - [ ] Confirm stairs ≥ 95/100 steps and SI < 3% in bare-metal simulation
+- [ ] Confirm phase segmenter stance/swing durations within ±20ms of ground truth (all 4 profiles)
 - [ ] Update `memory/bugs.md` — BUG-010 status: RESOLVED
 - [ ] Commit and push
 
 ---
 
-## 9. Files
+## 10. Files
 
 | File | Role |
 |---|---|
@@ -202,4 +270,6 @@ Per CLAUDE.md learner-in-the-loop rules:
 | `scripts/plot_si_comparison.py` | Standard vs terrain-aware comparison plot |
 | `docs/plots/gyr_emd_terrain_comparison.png` | Signal audit — all 4 walkers, HP-filtered gyr_y |
 | `docs/plots/si_comparison_standard_vs_terrain.png` | SI comparison — human review checkpoint |
+| `docs/plots/swing_stance_comparison.png` | Swing/stance architectural impact — phase segmenter contract |
 | `docs/plots/stair_walker_signal_check.png` | Original failure mode diagnostic |
+| `scripts/plot_swing_stance_comparison.py` | Generates swing/stance impact plot |
