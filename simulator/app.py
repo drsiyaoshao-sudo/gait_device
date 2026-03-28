@@ -80,6 +80,16 @@ pathological = st.sidebar.toggle(
 )
 si_override = 25.0 if pathological else None
 
+show_comparison = st.sidebar.toggle(
+    "Show algorithm comparison",
+    value=False,
+    help="Overlay original dual-confirmation algorithm (dashed) vs "
+         "terrain-aware algorithm (solid) for all four profiles. "
+         "Available in algorithm simulation mode only. "
+         "The stair walker is the key story: the original algorithm detects "
+         "0 steps on stairs — the terrain-aware algorithm detects 100/100.",
+)
+
 n_steps = st.sidebar.slider("Steps to simulate", min_value=50, max_value=500,
                              value=200, step=50)
 
@@ -107,17 +117,8 @@ else:
 _mode_label = "Embedded firmware" if use_renode else "Algorithm simulation"
 st.sidebar.caption(f"Engine: {_mode_label}")
 
-# ── Algorithm comparison (Python path only) ───────────────────────────────────
-if not use_renode:
-    show_comparison = st.sidebar.toggle(
-        "Show algorithm comparison",
-        value=False,
-        help="Overlay original dual-confirmation algorithm (dashed) vs "
-             "terrain-aware algorithm (solid) for all four profiles. "
-             "The stair walker is the key story: the original algorithm detects "
-             "0 steps on stairs — the terrain-aware algorithm detects 100/100.",
-    )
-else:
+# Algorithm comparison only applies to the Python simulation path
+if use_renode:
     show_comparison = False
 
 # ─────────────────────────────────────────────────────────────────────────────
