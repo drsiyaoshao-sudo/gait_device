@@ -22,6 +22,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
+from typing import Optional
 
 from walker_model import PROFILES
 from pipeline import run_profile, run_all_profiles, PipelineResult, renode_status
@@ -53,15 +54,15 @@ SI_CLINICAL_THRESHOLD = 10.0   # Robinson et al. 1987
 # ─────────────────────────────────────────────────────────────────────────────
 
 st.sidebar.title("Gait Digital Twin")
-st.sidebar.caption("Standard gait imbalance algorithm — terrain efficacy study")
+st.sidebar.caption("Agentic algorithm search & validation across terrain profiles")
 
 st.sidebar.markdown("---")
 
 profile_labels = {
-    "flat":     "Walker 1 — Flat (reference)",
-    "bad_wear": "Walker 2 — Bad wearing",
-    "stairs":   "Walker 3 — Stairs",
-    "slope":    "Walker 4 — Slope (10°)",
+    "flat":     "Walker 1 — Flat ground (reference)",
+    "bad_wear": "Walker 2 — Poor device fit",
+    "stairs":   "Walker 3 — Ascending stairs",
+    "slope":    "Walker 4 — Inclined surface (10°)",
 }
 
 selected_key = st.sidebar.selectbox(
@@ -71,10 +72,11 @@ selected_key = st.sidebar.selectbox(
 )
 
 pathological = st.sidebar.toggle(
-    "Pathological asymmetry (SI ≈ 25%)",
+    "Simulate gait asymmetry (SI ≈ 25%)",
     value=False,
-    help="Inject a 25% true SI into all four profiles by alternating "
-         "odd/even stance duration. Healthy walkers show SI ≈ 0%.",
+    help="Inject a clinically significant asymmetry (25% true SI) into all four "
+         "profiles by alternating stance duration between limbs. "
+         "Healthy walkers show SI ≈ 0%.",
 )
 si_override = 25.0 if pathological else None
 
@@ -88,38 +90,35 @@ run_clicked = st.sidebar.button("Run Simulation", type="primary", use_container_
 
 st.sidebar.markdown("---")
 
-# ── Renode status panel ──────────────────────────────────────────────────────
+# ── Simulation engine panel ───────────────────────────────────────────────────
 _rn = renode_status()
 if _rn["available"]:
     use_renode = st.sidebar.toggle(
-        "Use Renode (embedded firmware)",
+        "Validate on embedded firmware",
         value=False,
-        help="Run the actual firmware ELF inside Renode instead of the Python algorithm. "
-             "Requires `renode` on PATH and a built firmware.elf.",
+        help="Run the actual compiled firmware on a virtual microcontroller "
+             "instead of the algorithm model. Requires Renode and a built firmware.",
     )
-    st.sidebar.success(
-        f"Renode found: `{_rn['renode_path']}`  \n"
-        f"ELF: `{_rn['elf_path']}`"
-    )
+    st.sidebar.success("Embedded firmware available")
 else:
     use_renode = False
-    missing = []
-    if not _rn["renode_found"]:
-        missing.append("renode binary")
-    if not _rn["elf_found"]:
-        missing.append("firmware.elf")
-    st.sidebar.info(
-        "**Python path active** (Renode unavailable)  \n"
-        f"Missing: {', '.join(missing)}  \n"
-        "_Build firmware (`pio run`) and install Renode to enable._"
-    )
+    st.sidebar.info("Algorithm simulation mode")
 
-_path_label = (
-    "walker\\_model → **Renode** (firmware.elf)"
-    if use_renode
-    else "walker\\_model → gait\\_algorithm (Python)"
-)
-st.sidebar.caption(f"Pipeline: {_path_label}")
+_mode_label = "Embedded firmware" if use_renode else "Algorithm simulation"
+st.sidebar.caption(f"Engine: {_mode_label}")
+
+# ── Algorithm comparison (Python path only) ───────────────────────────────────
+if not use_renode:
+    show_comparison = st.sidebar.toggle(
+        "Show algorithm comparison",
+        value=False,
+        help="Overlay original dual-confirmation algorithm (dashed) vs "
+             "terrain-aware algorithm (solid) for all four profiles. "
+             "The stair walker is the key story: the original algorithm detects "
+             "0 steps on stairs — the terrain-aware algorithm detects 100/100.",
+    )
+else:
+    show_comparison = False
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Session state — persist results across reruns
@@ -127,16 +126,20 @@ st.sidebar.caption(f"Pipeline: {_path_label}")
 
 if "results" not in st.session_state:
     st.session_state.results = None
+if "legacy_results" not in st.session_state:
+    st.session_state.legacy_results = None
 if "n_steps_run" not in st.session_state:
     st.session_state.n_steps_run = 0
 if "via_renode" not in st.session_state:
     st.session_state.via_renode = False
 if "pathological" not in st.session_state:
     st.session_state.pathological = False
+if "show_comparison_run" not in st.session_state:
+    st.session_state.show_comparison_run = False
 
 if run_clicked:
-    _label = "Running Renode simulation for all 4 walkers..." if use_renode \
-             else "Running simulation for all 4 walkers..."
+    _label = "Running simulation on embedded firmware..." if use_renode \
+             else "Running simulation..."
     with st.spinner(_label):
         import warnings
         with warnings.catch_warnings(record=True) as _warns:
@@ -145,29 +148,45 @@ if run_clicked:
                 n_steps=n_steps, seed=int(seed), use_renode=use_renode,
                 si_override=si_override, profile_keys=DISPLAY_PROFILES,
             )
+            if show_comparison and not use_renode:
+                st.session_state.legacy_results = run_all_profiles(
+                    n_steps=n_steps, seed=int(seed), use_renode=False,
+                    si_override=si_override, profile_keys=DISPLAY_PROFILES,
+                    use_legacy=True,
+                )
+            else:
+                st.session_state.legacy_results = None
         st.session_state.n_steps_run = n_steps
         st.session_state.via_renode = use_renode
         st.session_state.pathological = pathological
+        st.session_state.show_comparison_run = show_comparison and not use_renode
         for w in _warns:
             st.warning(f"⚠️ {w.message}", icon="⚠️")
 
-from typing import Optional
 results: Optional[dict] = st.session_state.results
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Header
 # ─────────────────────────────────────────────────────────────────────────────
 
-_pipeline_badge = (
-    " — :green[Renode path (firmware.elf)]" if st.session_state.via_renode
-    else " — :blue[Python path (gait\\_algorithm)]"
+_mode_badge = (
+    " — :green[Embedded firmware]" if st.session_state.via_renode
+    else " — :blue[Algorithm simulation]"
 )
-st.title("Gait Digital Twin Simulator" + _pipeline_badge)
-st.caption(
-    "All walkers are healthy and symmetric (true SI = 0%). "
-    "The question: does the standard single-ankle gait algorithm correctly report SI ≈ 0% "
-    "across different terrains?"
-)
+st.title("Gait Digital Twin Simulator" + _mode_badge)
+
+if st.session_state.pathological:
+    st.caption(
+        "Simulated asymmetry: true SI = 25% for all walkers. "
+        "Readings above the clinical threshold are true positives — "
+        "the device should flag these as abnormal."
+    )
+else:
+    st.caption(
+        "All walkers are healthy and symmetric (true SI = 0%). "
+        "The question: does the developed gait algorithm correctly report SI ≈ 0% "
+        "across all terrains, or does terrain corrupt the output?"
+    )
 
 if results is None:
     st.info("Configure parameters in the sidebar and click **Run Simulation**.")
@@ -177,16 +196,16 @@ if results is None:
 # Panel 2 — SI time series, all 4 walkers (shown first — it's the key output)
 # ─────────────────────────────────────────────────────────────────────────────
 
-st.subheader("Detected Symmetry Index — All Walkers")
+st.subheader("Symmetry Index Over Time — All Walkers")
 if st.session_state.pathological:
     st.caption(
-        f"Clinical threshold: SI > {SI_CLINICAL_THRESHOLD}% = asymmetric. "
-        "**Pathological mode:** true SI = 25% for all walkers. Readings above threshold are true positives."
+        f"Clinical threshold (Robinson et al.): SI > {SI_CLINICAL_THRESHOLD}% = asymmetric gait. "
+        "**Asymmetry mode active** — all walkers carry a 25% true SI. Lines above the threshold are correct detections."
     )
 else:
     st.caption(
-        f"Clinical threshold: SI > {SI_CLINICAL_THRESHOLD}% = asymmetric. "
-        "**Healthy mode:** true SI = 0% for all walkers. Any reading above threshold is a false positive."
+        f"Clinical threshold (Robinson et al.): SI > {SI_CLINICAL_THRESHOLD}% = asymmetric gait. "
+        "**Healthy mode** — all walkers are symmetric. Any line above the threshold is a false positive."
     )
 
 fig_si = go.Figure()
@@ -213,8 +232,8 @@ for key, res in results.items():
     ))
 
 fig_si.update_layout(
-    xaxis_title="Step index (anchor)",
-    yaxis_title="SI stance (%)",
+    xaxis_title="Step count",
+    yaxis_title="Symmetry Index — stance (%)",
     yaxis=dict(range=[0, max(60, SI_CLINICAL_THRESHOLD * 2)]),
     legend=dict(orientation="h", yanchor="bottom", y=1.02),
     height=380,
@@ -223,12 +242,107 @@ fig_si.update_layout(
 st.plotly_chart(fig_si, use_container_width=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Algorithm comparison panel (algorithm simulation mode only)
+# ─────────────────────────────────────────────────────────────────────────────
+
+legacy_results: Optional[dict] = st.session_state.legacy_results
+
+if st.session_state.show_comparison_run and legacy_results is not None:
+    st.subheader("Algorithm Comparison — Terrain-Aware vs. Original")
+    st.caption(
+        "**Solid lines** — terrain-aware algorithm (push-off primary trigger, ring-buffer heel-strike inference). "
+        "**Dashed lines** — original dual-confirmation algorithm (acc peak → 40 ms window → gyr_y zero-cross). "
+        "The stair walker reveals the original algorithm's failure: missed steps and corrupted SI. "
+        "On the embedded firmware path the original algorithm detects **0/100 steps** on stairs — "
+        "the full failure mode is only visible in Renode bare-metal simulation."
+    )
+
+    fig_cmp = go.Figure()
+    fig_cmp.add_hline(
+        y=SI_CLINICAL_THRESHOLD,
+        line_dash="dash", line_color="red", line_width=1,
+        annotation_text=f"Clinical threshold ({SI_CLINICAL_THRESHOLD}%)",
+        annotation_position="bottom right",
+    )
+    fig_cmp.add_hrect(y0=SI_CLINICAL_THRESHOLD, y1=60,
+                      fillcolor="red", opacity=0.05, line_width=0)
+
+    for key in DISPLAY_PROFILES:
+        color = WALKER_COLORS[key]
+        label = profile_labels[key]
+
+        # New terrain-aware (solid)
+        res_new = results.get(key)
+        if res_new and res_new.snapshots:
+            fig_cmp.add_trace(go.Scatter(
+                x=res_new.snapshot_steps,
+                y=res_new.snapshot_si_stance,
+                mode="lines+markers",
+                name=f"{label} — terrain-aware",
+                line=dict(color=color, width=2),
+                marker=dict(size=5),
+                legendgroup=key,
+            ))
+
+        # Legacy dual-confirmation (dashed)
+        res_leg = legacy_results.get(key)
+        if res_leg and res_leg.snapshots:
+            fig_cmp.add_trace(go.Scatter(
+                x=res_leg.snapshot_steps,
+                y=res_leg.snapshot_si_stance,
+                mode="lines+markers",
+                name=f"{label} — original",
+                line=dict(color=color, width=2, dash="dot"),
+                marker=dict(size=4, symbol="circle-open"),
+                legendgroup=key,
+            ))
+        elif res_leg and not res_leg.snapshots:
+            # Zero steps detected — show annotation at y=0
+            fig_cmp.add_annotation(
+                x=0.5, xref="paper",
+                y=2, yref="y",
+                text=f"{label} (original): 0 steps detected",
+                showarrow=False,
+                font=dict(color=color, size=11),
+                xanchor="center",
+            )
+
+    # Step count comparison table beneath chart
+    step_data: dict = {"Walker": [], "Steps (terrain-aware)": [], "Steps (original)": []}
+    for key in DISPLAY_PROFILES:
+        step_data["Walker"].append(profile_labels[key])
+        step_data["Steps (terrain-aware)"].append(
+            str(results[key].step_count) if key in results else "—"
+        )
+        step_data["Steps (original)"].append(
+            str(legacy_results[key].step_count) if key in legacy_results else "—"
+        )
+
+    fig_cmp.update_layout(
+        xaxis_title="Step count",
+        yaxis_title="Symmetry Index — stance (%)",
+        yaxis=dict(range=[0, max(60, SI_CLINICAL_THRESHOLD * 2)]),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        height=400,
+        margin=dict(t=10, b=40),
+    )
+    st.plotly_chart(fig_cmp, use_container_width=True)
+    st.table(step_data)
+
+elif show_comparison and not st.session_state.show_comparison_run:
+    st.info(
+        "Algorithm comparison is enabled. Click **Run Simulation** to generate "
+        "both algorithm paths and display the overlay."
+    )
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Detail panels for selected walker
 # ─────────────────────────────────────────────────────────────────────────────
 
 res = results[selected_key]
 color = WALKER_COLORS[selected_key]
 odr = 208.0
+true_si = 25.0 if st.session_state.pathological else 0.0
 
 st.markdown("---")
 st.subheader(f"Detail — {profile_labels[selected_key]}")
@@ -239,18 +353,18 @@ col2.metric("Snapshots", len(res.snapshots))
 
 final_si = res.snapshot_si_stance[-1] if res.snapshots else 0.0
 col3.metric(
-    "Final SI stance",
+    "Final SI (stance)",
     f"{final_si:.1f}%",
-    delta=f"{final_si - 0:.1f}% vs true 0%",
+    delta=f"{final_si - true_si:+.1f}% vs true {true_si:.0f}%",
     delta_color="inverse",
 )
-col4.metric("Mounting suspect steps", res.mounting_suspect_count)
+col4.metric("Mounting alerts", res.mounting_suspect_count)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Panel 1 — Raw IMU signal + step markers
 # ─────────────────────────────────────────────────────────────────────────────
 
-st.subheader("Raw IMU Signal — acc_z and gyr_y")
+st.subheader("Raw Sensor Signal")
 
 MAX_DISPLAY_SAMPLES = 4000   # ~19s at 208 Hz — keep chart responsive
 samples_display = res.samples[:MAX_DISPLAY_SAMPLES]
@@ -258,7 +372,7 @@ t_ms = np.arange(len(samples_display)) / odr * 1000.0
 
 fig_imu = make_subplots(
     rows=2, cols=1, shared_xaxes=True,
-    subplot_titles=("acc_z  (m/s²)", "gyr_y  (dps)"),
+    subplot_titles=("Vertical acceleration  (m/s²)", "Ankle angular velocity  (dps)"),
     vertical_spacing=0.08,
 )
 
@@ -290,7 +404,7 @@ st.plotly_chart(fig_imu, use_container_width=True)
 # Panel 3 — Phase timing bars (stance / swing per step)
 # ─────────────────────────────────────────────────────────────────────────────
 
-st.subheader("Phase Timing — Stance / Swing per Step")
+st.subheader("Gait Phase Timing — Stance / Swing per Step")
 
 valid_records = [r for r in res.records if r.valid]
 
@@ -314,52 +428,55 @@ if valid_records:
     ))
     fig_phase.update_layout(
         barmode="stack",
-        xaxis_title="Step index",
+        xaxis_title="Step",
         yaxis_title="Duration (ms)",
         height=320,
         margin=dict(t=10, b=40),
         legend=dict(orientation="h", yanchor="bottom", y=1.02),
     )
     if any(suspect):
-        st.caption("Red bars: `mounting_suspect` flag set on that step.")
+        st.caption("Orange bars: device mounting alert flagged on that step.")
     st.plotly_chart(fig_phase, use_container_width=True)
 else:
-    st.warning("No valid phase records — step detector found no steps.")
+    st.warning("No phase records available for this profile.")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Panel 4 — Profile derived parameters
 # ─────────────────────────────────────────────────────────────────────────────
 
-st.subheader("Derived Physical Parameters")
+st.subheader("Profile Summary")
 
 col_a, col_b = st.columns(2)
 
 with col_a:
-    st.markdown("**Profile parameters (derived from three primitives)**")
+    st.markdown("**Biomechanical parameters**")
     params = res.summary
     rows = [[k, str(v)] for k, v in params.items()]
     st.table({"Parameter": [r[0] for r in rows],
               "Value":     [r[1] for r in rows]})
 
 with col_b:
-    st.markdown("**Detection summary**")
+    st.markdown("**Detection results**")
     detection_rate = res.step_count / n_steps * 100 if n_steps > 0 else 0
     si_values = res.snapshot_si_stance
+    above_threshold = any(s > SI_CLINICAL_THRESHOLD for s in si_values)
+    threshold_label = "True positive" if (above_threshold and st.session_state.pathological) \
+                      else ("False positive" if above_threshold else "No")
     st.table({
         "Metric": [
             "Steps generated",
             "Steps detected",
             "Detection rate",
-            "False positive (SI > 10%)",
-            "Mean SI stance",
-            "Max SI stance",
-            "Mounting suspect steps",
+            "Above clinical threshold",
+            "Mean SI (stance)",
+            "Max SI (stance)",
+            "Mounting alerts",
         ],
         "Value": [
             str(n_steps),
             str(res.step_count),
             f"{detection_rate:.1f}%",
-            "Yes" if any(s > SI_CLINICAL_THRESHOLD for s in si_values) else "No",
+            threshold_label,
             f"{res.si_mean():.1f}%" if si_values else "—",
             f"{res.si_max():.1f}%" if si_values else "—",
             str(res.mounting_suspect_count),

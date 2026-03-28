@@ -485,15 +485,18 @@ WARMUP_STEPS = 10   # first N step records are excluded from the rolling window
 
 
 def run(samples: np.ndarray,
-        bias: np.ndarray | None = None
+        bias: np.ndarray | None = None,
+        use_legacy: bool = False,
         ) -> tuple[list[StepEvent], list[SnapshotEvent], list[StepRecord]]:
     """
     Run the full gait pipeline on a (N,6) sample array.
 
     Parameters
     ----------
-    samples : np.ndarray (N, 6)  [ax ay az gx gy gz]
-    bias    : np.ndarray (6,)    calibration bias; computed from samples if None
+    samples    : np.ndarray (N, 6)  [ax ay az gx gy gz]
+    bias       : np.ndarray (6,)    calibration bias; computed from samples if None
+    use_legacy : bool               if True, use original dual-confirmation StepDetector
+                                    instead of the terrain-aware detector
 
     Returns
     -------
@@ -536,38 +539,55 @@ def run(samples: np.ndarray,
             return
         win.add(rec)
 
-    from terrain_aware_step_detector import (
-        TerrainAwareStepDetector,
-        StepEvent as _TStepEvent,
-    )
-
-    det = TerrainAwareStepDetector()
     seg = PhaseSegmenter(foot_angle=fa, on_step=on_record)
-
     cal = samples - bias
 
-    for i, row in enumerate(cal):
-        ax, ay, az, gx, gy, gz = row
-        ts_ms = i / ODR_HZ * 1000.0
-        fa.update(ax, az, gy)
-        tev: _TStepEvent | None = det.update(ts_ms, ax, ay, az, gy)
-        if tev is not None:
-            ev = StepEvent(
-                step_index   = tev.step_index,
-                ts_ms        = tev.heel_strike_ts_ms,   # heel-strike ts for phase segmenter
-                peak_acc_mag = tev.acc_peak_ms2,
-                peak_gyr_y   = 0.0,
-                cadence_spm  = det._cadence_spm,
-            )
-            on_step(ev)
-        seg.update(ax, az, gy, ts_ms)
+    if use_legacy:
+        # Original dual-confirmation detector: acc_filt peak → 40ms window → gyr_y zero-cross.
+        # Fails on stairs due to timing mismatch (135ms gap vs 40ms window).
+        det_legacy = StepDetector(on_step=on_step)
 
-        if i == n_cal - 1:
-            # Calibration window complete.  Reset state machines and open the
-            # event gate so real walking steps are emitted.
-            det.reset()
-            seg.reset()
-            fa.reset()
-            _cal_done = True
+        for i, row in enumerate(cal):
+            ax, ay, az, gx, gy, gz = row
+            ts_ms = i / ODR_HZ * 1000.0
+            fa.update(ax, az, gy)
+            det_legacy.update(ax, ay, az, gy, ts_ms)
+            seg.update(ax, az, gy, ts_ms)
+
+            if i == n_cal - 1:
+                det_legacy.reset()
+                seg.reset()
+                fa.reset()
+                _cal_done = True
+
+    else:
+        from terrain_aware_step_detector import (
+            TerrainAwareStepDetector,
+            StepEvent as _TStepEvent,
+        )
+
+        det = TerrainAwareStepDetector()
+
+        for i, row in enumerate(cal):
+            ax, ay, az, gx, gy, gz = row
+            ts_ms = i / ODR_HZ * 1000.0
+            fa.update(ax, az, gy)
+            tev: _TStepEvent | None = det.update(ts_ms, ax, ay, az, gy)
+            if tev is not None:
+                ev = StepEvent(
+                    step_index   = tev.step_index,
+                    ts_ms        = tev.heel_strike_ts_ms,
+                    peak_acc_mag = tev.acc_peak_ms2,
+                    peak_gyr_y   = 0.0,
+                    cadence_spm  = det._cadence_spm,
+                )
+                on_step(ev)
+            seg.update(ax, az, gy, ts_ms)
+
+            if i == n_cal - 1:
+                det.reset()
+                seg.reset()
+                fa.reset()
+                _cal_done = True
 
     return steps, snapshots, records

@@ -113,10 +113,11 @@ def _run_python(
     profile: WalkerProfile,
     n_steps: int,
     seed: int,
+    use_legacy: bool = False,
 ) -> PipelineResult:
     rng     = np.random.default_rng(seed)
     samples = generate_imu_sequence(profile, n_steps, rng=rng)
-    steps, snapshots, records = _run_algorithm(samples)
+    steps, snapshots, records = _run_algorithm(samples, use_legacy=use_legacy)
 
     return PipelineResult(
         profile    = profile,
@@ -174,6 +175,7 @@ def run_profile(
     use_renode:  bool  = False,
     elf_path:    Optional[str]   = None,
     si_override: Optional[float] = None,
+    use_legacy:  bool  = False,
 ) -> PipelineResult:
     """
     Run a single walker profile through the simulation pipeline.
@@ -206,7 +208,7 @@ def run_profile(
                     stacklevel=2,
                 )
         # Graceful fallback: Renode not found, ELF not built, or run failed
-    return _run_python(profile, n_steps, seed)
+    return _run_python(profile, n_steps, seed, use_legacy=use_legacy)
 
 
 def run_all_profiles(
@@ -216,15 +218,18 @@ def run_all_profiles(
     elf_path:    Optional[str]   = None,
     si_override: Optional[float] = None,
     profile_keys: Optional[list] = None,
+    use_legacy:  bool  = False,
 ) -> dict[str, PipelineResult]:
     """Run walker profiles and return results keyed by profile name.
 
     profile_keys: subset of PROFILES to run; defaults to all.
     si_override:  if set, overrides si_stance_true_pct on every profile.
+    use_legacy:   if True, use original dual-confirmation step detector.
     """
     keys = profile_keys if profile_keys is not None else list(PROFILES.keys())
     return {
-        key: run_profile(PROFILES[key], n_steps, seed, use_renode, elf_path, si_override)
+        key: run_profile(PROFILES[key], n_steps, seed, use_renode, elf_path,
+                         si_override, use_legacy=use_legacy)
         for key in keys
     }
 
