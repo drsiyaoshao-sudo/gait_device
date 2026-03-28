@@ -13,6 +13,8 @@ This document is the single-source handoff package for physical bring-up of the 
 
 If physical results deviate significantly from the simulation predictions in this document, that is a hardware or mounting problem, not a firmware problem.
 
+> **Debug reference:** [`docs/bug_receipt.md`](bug_receipt.md) contains every bug found during simulation (12 total), with symptom, root cause, exact fix, and files changed. Match any unexpected hardware behaviour against that list before concluding the fault is new.
+
 ---
 
 ## 1. Algorithm Overview — What the Firmware Does
@@ -538,7 +540,7 @@ Requires Renode 1.16.1 on PATH and built ELF at `.pio/build/xiaoble_sense_sim/ze
 |---|---|
 | `docs/hw_bom.md` | Full BOM — part numbers, suppliers, prices |
 | `docs/sw_bom.md` | Software dependencies and versions |
-| `memory/bugs.md` | All 12 simulation bugs — root cause, fix, verified result |
+| `docs/bug_receipt.md` | All 12 simulation bugs — symptom, root cause, fix, files changed; hardware porting watch list |
 | `docs/algorithm_hunting_stair_walker.md` | Stair failure mode investigation with signal plots |
 | `src/gait/step_detector.c` | Push-off primary step detector with ring-buffer heel-strike inference |
 | `src/gait/phase_segmenter.c` | Gait phase FSM — terrain-agnostic MID_STANCE gate |
