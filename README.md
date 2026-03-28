@@ -194,17 +194,21 @@ Four panels:
 4. **Gait Phase Timing** — stance/swing duration bars per step; orange = mounting alert
 5. **Profile Summary** — biomechanical parameters and detection statistics
 
-### Renode path (requires firmware ELF)
+### Renode path (pre-built ELF included — no toolchain required)
 
-If Renode ≥ 1.15 is installed and a firmware ELF has been built, the "Validate on embedded firmware" toggle appears in the sidebar. This runs the real C firmware on a virtual nRF52840 instead of the Python algorithm model.
+A validated pre-built firmware ELF is committed at `firmware/zephyr_sim_2026-03-28.elf`. This is the BUG-013-fixed build confirmed against all 4 profiles in both healthy and pathological modes (2026-03-28). You do not need to install PlatformIO or the nRF Connect SDK to run the Renode digital twin.
 
 ```bash
 # Install Renode (macOS)
 brew install --cask renode
 
-# Build firmware (see Section 2a), then launch UI
+# Launch UI — the pre-built ELF is detected automatically
 streamlit run simulator/app.py
 ```
+
+The bridge searches for the ELF in this order: `firmware/zephyr_sim_2026-03-28.elf` → `.pio/build/.../zephyr/zephyr.elf` (if you have built locally) → fallback. If Renode is installed and the ELF is found, the "Validate on embedded firmware" toggle appears in the sidebar automatically.
+
+If you later build your own ELF (see Section 2a), the locally-built version takes precedence over the pre-built one.
 
 ---
 

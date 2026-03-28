@@ -49,6 +49,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # PlatformIO's own firmware.elf omits libapp.a (a known PlatformIO-Zephyr bug
 # where the app target is excluded from SCons link and native compilation is skipped).
 # The two-step build (pio run → ninja zephyr.elf) produces the correct binary.
+# firmware/ contains the pre-built validated ELF — no toolchain required to run Renode.
+_PREBUILT_ELF = _PROJECT_ROOT / "firmware/zephyr_sim_2026-03-28.elf"          # pre-built, validated (BUG-013 fixed)
 _DEFAULT_ELF  = _PROJECT_ROOT / ".pio/build/xiaoble_sense_sim/zephyr/zephyr.elf"
 _PIO_ELF      = _PROJECT_ROOT / ".pio/build/xiaoble_sense_sim/firmware.elf"   # fallback only
 
@@ -89,14 +91,16 @@ def detect_renode() -> Optional[str]:
 def detect_firmware(elf_path: Optional[str | Path] = None) -> Optional[str]:
     """Return path to the sim firmware ELF if it exists, else None.
 
-    Prefers the ninja-produced ``zephyr/zephyr.elf`` which correctly links
-    ``app/libapp.a``.  Falls back to PlatformIO's ``firmware.elf`` (which
-    lacks app code due to a PlatformIO-Zephyr build system mismatch) only as
-    a last resort so callers can detect that a build is needed.
+    Search order:
+    1. Caller-supplied elf_path
+    2. firmware/zephyr_sim_2026-03-28.elf — pre-built validated binary (no toolchain needed)
+    3. .pio/build/.../zephyr/zephyr.elf   — ninja two-step build output (preferred if built)
+    4. .pio/build/.../firmware.elf         — PlatformIO default (may lack app code, last resort)
     """
     candidates = [
         Path(elf_path) if elf_path else None,
-        _DEFAULT_ELF,       # ninja zephyr.elf — preferred
+        _PREBUILT_ELF,      # pre-built validated ELF — works without PlatformIO toolchain
+        _DEFAULT_ELF,       # ninja zephyr.elf — preferred if engineer has built locally
         _PIO_ELF,           # PlatformIO firmware.elf — fallback (may lack app code)
         _PROJECT_ROOT / ".pio/build/xiaoble_sense/firmware.elf",
     ]
