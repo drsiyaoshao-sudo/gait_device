@@ -626,4 +626,36 @@ Known failure mode (pathological asymmetry)
 
 No IMU. No nRF52840 board. No patient. Caught in software by injecting a physics-grounded signal and demanding a specific clinical output.
 
+---
+
+## Algorithm Comparison Finding — Poor Device Fit (2026-03-28)
+
+**Observed during algorithm comparison overlay (GUI, Python simulation path, pathological mode):**
+
+The original dual-confirmation algorithm underestimates the Symmetry Index for the **poor device fit** profile (`bad_wear`) in pathological mode, while the terrain-aware algorithm reports the correct elevated SI.
+
+### Why this happens
+
+The poor device fit profile (`bad_wear`) introduces signal noise and timing variability from mounting uncertainty — the device shifts on the ankle, introducing small rotational perturbations on every step. The original algorithm's 40ms gyr_y zero-crossing confirmation window is sensitive to this: perturbations smear the exact timing of the gyr_y sign reversal relative to the acc_filt peak. Some steps are dropped or mis-timed, which corrupts the odd/even stance duration balance in the rolling window → the SI is underestimated → the device under-reports asymmetry for a patient who is already compromised by a poorly fitted device.
+
+The terrain-aware algorithm is robust to this because its primary trigger is the **push-off plantar-flexion burst** (gyr_y_hp > 30 dps) — a large-amplitude muscle event that is mechanically decoupled from mounting position. Mounting perturbations do not suppress the push-off burst; they only affect the fine timing of smaller-amplitude events that the original algorithm depended on.
+
+### Clinical implication
+
+This expands the justification for the algorithm search beyond its original scope:
+
+| Original motivation | Extended finding |
+|---|---|
+| Fix stair walker: 0/100 steps detected (terrain biomechanics failure) | Fix poor device fit: SI underestimated in pathological mode (signal morphology robustness) |
+
+The terrain-aware algorithm simultaneously resolves two distinct failure modes:
+1. **Terrain failure** — stair biomechanics break the flat-ground timing assumption (acc peak ↔ gyr_y gap: 135ms >> 40ms window)
+2. **Mounting failure** — poor device fit smears gyr_y confirmation timing → missed steps → corrupted odd/even balance → clinically false-low SI
+
+Both failures share the same root cause: reliance on a precise short-duration timing gate between two signals. The terrain-aware algorithm eliminates that gate entirely by using a biomechanically universal primary trigger.
+
+### Verification
+
+Visible in the GUI algorithm comparison panel: toggle **"Show algorithm comparison"** + **"Simulate gait asymmetry (SI ≈ 25%)"** in algorithm simulation mode. The `bad_wear` dashed line (original) tracks below the `bad_wear` solid line (terrain-aware) — both above threshold, but the original underestimates the magnitude. On the embedded firmware path (Renode), the full quantitative difference is observable.
+
 
