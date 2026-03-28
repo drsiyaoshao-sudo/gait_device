@@ -123,6 +123,43 @@ def parse_uart_log(text: str) -> tuple[
 # Binary snapshot parser (CONFIG_GAIT_UART_EXPORT=y)
 # ─────────────────────────────────────────────────────────────────────────────
 
+def parse_binary_export_log(text: str) -> list[SnapshotEvent]:
+    """Extract the BLE binary export block from a text UART log.
+
+    The firmware (CONFIG_GAIT_UART_EXPORT=y) emits:
+        BLE_BINARY_START count=N
+        <40 hex chars = 20-byte rolling_snapshot_t, one per line>
+        BLE_BINARY_END
+
+    This function hex-decodes those lines, prepends the GA1T magic header,
+    and calls parse_binary_snapshots() so the same unpack path used by the
+    real BLE host tool is exercised.
+
+    Returns an empty list if no BLE_BINARY_START block is found.
+    """
+    count = 0
+    hex_lines: list[str] = []
+    in_export = False
+
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("BLE_BINARY_START"):
+            m = re.search(r"count=(\d+)", line)
+            count = int(m.group(1)) if m else 0
+            in_export = True
+        elif line == "BLE_BINARY_END":
+            in_export = False
+        elif in_export and len(line) == _SNAPSHOT_STRUCT_SIZE * 2:
+            hex_lines.append(line)
+
+    if not hex_lines:
+        return []
+
+    header = _BINARY_MAGIC + struct.pack("<I", count)
+    body = b"".join(bytes.fromhex(h) for h in hex_lines)
+    return parse_binary_snapshots(header + body)
+
+
 def parse_binary_snapshots(data: bytes) -> list[SnapshotEvent]:
     """Unpack a binary snapshot dump from CONFIG_GAIT_UART_EXPORT firmware.
 

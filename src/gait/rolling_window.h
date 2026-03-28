@@ -17,7 +17,7 @@ typedef struct __attribute__((packed)) {
     uint16_t mean_cadence_x10;    /* mean cadence × 10 (spm)              */
     uint8_t  step_count;          /* steps in window (< WINDOW_SIZE at start) */
     uint8_t  flags;               /* bit0: walking, bit1: running          */
-} rolling_snapshot_t;             /* 20 bytes */
+} rolling_snapshot_t;             /* 18 bytes: 4+4+2+2+2+2+1+1 */
 
 typedef void (*snapshot_cb_t)(const rolling_snapshot_t *snap);
 
