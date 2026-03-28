@@ -455,3 +455,36 @@ Python reference implementation: `simulator/terrain_aware_step_detector.py`
 C implementation: `src/gait/step_detector.c`
 Report: `docs/reports/gait_simulation_report_2026-03-27.pdf`
 
+---
+
+## HW-SW Co-Design Procedure — Equivalence to Software Development
+
+This section maps the agentic hardware-software co-design procedure used in this project to standard software development concepts. Use it to onboard engineers familiar with software CI/CD but new to hardware-in-the-loop development.
+
+The key structural difference from pure software: **staging and production are physically different substrates** (virtual silicon vs. real silicon). A regression that slips into a flashed ELF cannot be patched with `git revert`. The simulation pipeline is the test harness. The handoff document is the release notes. The physical device is the immutable deploy.
+
+| Software Dev Concept | This Project's Equivalent |
+|---|---|
+| `git init` | Stage 1: write firmware C files — establishes the ground truth that all downstream stages verify |
+| `git commit` | Confirmed stage exit criterion — each `[x]` in CLAUDE.md is a durable, auditable checkpoint |
+| `git branch` | New walker profile or failure mode — isolated line of investigation that cannot break passing profiles |
+| `git diff` | Signal plots + UART snapshot table before/after an algorithm change — the human-readable "what changed" |
+| `git push` | Stage 5: flash ELF to physical hardware — irreversible within a session; same caution applies |
+| `git pull` | Re-running simulation after a firmware edit — pulling latest algorithm behaviour into the test harness |
+| `git merge` | Merging a simulation branch to `main` after all profiles pass — only valid when exit criteria are met |
+| `git revert` | Reverting a phase gate threshold or filter coefficient, re-running all 4 profiles to confirm no regression |
+| Unit tests (`pytest`) | `pytest simulator/tests/` + PlatformIO native tests — fast, no hardware, catches interface contract breaks |
+| Integration tests | Renode bare-metal simulation — real ELF, virtual Cortex-M4F, all 4 profiles × 100 steps |
+| Staging environment | Renode + `zephyr.elf` — functionally identical to production hardware, zero hardware risk |
+| Production deployment | Physical XIAO nRF52840 with LiPo — the only irreversible step in the pipeline |
+| CI/CD pipeline | The 7-layer digital twin — deterministic, automated, identical path every run |
+| Code review | Learner-in-the-loop: human reviews signal plots and snapshot tables at each milestone before advancing |
+| Feature flag | `CONFIG_GAIT_UART_EXPORT` Kconfig symbol — enables BLE export path without affecting the production binary |
+| Hotfix branch | Bug hunt branch (e.g. `ble-export-sim`) — isolated space to fix one failure mode |
+| Release candidate | `handoff-testing` branch — all Stage 3 criteria confirmed, docs written, ready for external validation |
+| Bug tracker | `docs/bug_receipt.md` — symptom, root cause, fix, files changed; permanent record across all sessions |
+| Regression test | Running all 4 walker profiles after any algorithm change — a profile that was passing must remain passing |
+| `git blame` | CLAUDE.md stage records + bug receipt — traces every threshold and design decision to a human confirmation |
+| Rollback plan | Three-strike rule (Rule 5) — after 3 failed attempts, stop and escalate rather than compound technical debt |
+
+
