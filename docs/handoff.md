@@ -1,8 +1,8 @@
 # GaitSense — Hardware Handoff Document
 
 **Prepared by:** Simulation & Firmware Team
-**Date:** 2026-03-27
-**Branch:** ble-export-sim → handoff-testing
+**Date:** 2026-03-28 (updated — includes BUG-013 fix and pathological walker validation)
+**Branch:** main (also mirrored to handoff-testing)
 **Target recipient:** Engineer with medium-level embedded knowledge (nRF52840 / Zephyr familiarity assumed; gait algorithm internals documented here)
 
 ---
@@ -13,7 +13,9 @@ This document is the single-source handoff package for physical bring-up of the 
 
 If physical results deviate significantly from the simulation predictions in this document, that is a hardware or mounting problem, not a firmware problem.
 
-> **Debug reference:** [`docs/bug_receipt.md`](bug_receipt.md) contains every bug found during simulation (12 total), with symptom, root cause, exact fix, and files changed. Match any unexpected hardware behaviour against that list before concluding the fault is new.
+> **Debug reference:** [`docs/bug_receipt.md`](bug_receipt.md) contains every bug found during simulation (13 total), with symptom, root cause, exact fix, and files changed. Match any unexpected hardware behaviour against that list before concluding the fault is new.
+>
+> **Critical pre-read before hardware bring-up:** BUG-013 (Section 2.3 below) — the SI computation was silently zeroed by a Renode FPU emulation bug. The fix is in `rolling_window.c`. The pre-built ELF at `firmware/zephyr_sim_2026-03-28.elf` contains this fix. If you build your own ELF, verify against the pathological walker test before trusting any SI output.
 
 ---
 
@@ -205,12 +207,64 @@ Stairs snapshot table — cadence convergence from CNN prior:
 | 7 | 79 | 0.0% | 0.0% | 73 |
 | 8 | 89 | 0.0% | 0.0% | 72 ← converged |
 
-### 2.2 Power Budget
+### 2.2 Pathological Walker Validation (2026-03-28)
+
+Symmetry asymmetry (25% true SI) injected into all four profiles via alternating ±45 ms stance offset on odd/even steps. A device that is working correctly must report SI > 10% (Robinson et al. clinical threshold) for all profiles.
+
+**Healthy mode (true SI = 0%) — all on Renode:**
+
+| Profile | Steps | Final SI | Verdict |
+|---|---|---|---|
+| Flat | 100/100 | 1.9% | Below 10% threshold ✓ |
+| Bad wear | 100/100 | 0.1% | Below 10% threshold ✓ |
+| Stairs | 100/100 | 2.9% | Below 10% threshold ✓ |
+| Slope 10° | 100/100 | 4.6% | Below 10% threshold ✓ |
+
+**Pathological mode (true SI = 25%) — all on Renode:**
+
+| Profile | Steps | Final SI | Verdict |
+|---|---|---|---|
+| Flat | 100/100 | 17.2% | True positive: above 10% threshold ✓ |
+| Bad wear | 100/100 | 23.8% | True positive: above 10% threshold ✓ |
+| Stairs | 100/100 | 19.3% | True positive: above 10% threshold ✓ |
+| Slope 10° | 100/100 | 22.6% | True positive: above 10% threshold ✓ |
+
+Non-zero healthy SI values are real: step variability noise creates small but genuine odd/even timing differences. Previously all reported 0.0% due to BUG-013 (VABS.F32) masking all SI computation — this was a silent fault.
+
+### 2.3 BUG-013 — Critical Safety Fix (VABS.F32 Broken in Renode 1.16.1)
+
+**Why this matters to a hardware validator:**
+
+Before this fix, the device reported SI = 0.0% for every patient regardless of actual gait asymmetry. The firmware compiled and ran correctly in every other respect. There were no crash symptoms. The only observable failure was a clinically false result.
+
+**What happened:**
+
+`compute_si_x10()` in `rolling_window.c` called `fabsf(m_odd - m_even)`. The ARM FPU instruction `VABS.F32` returns the wrong result in Renode 1.16.1 when applied to a computed FPU-register value — the emulator bug returns ≈0 instead of |x|. Healthy walkers were unaffected (correct answer is 0% regardless). Asymmetric walkers silently reported 0%.
+
+**Fix in `src/gait/rolling_window.c::compute_si_x10()`:**
+```c
+// Before (broken on Renode 1.16.1 — and potentially on real silicon under
+// specific compiler optimisation flags — avoid fabsf() on FPU-register inputs):
+float si = 200.0f * fabsf(m_odd - m_even) / denom;
+
+// After (correct on all targets):
+float diff = m_odd - m_even;
+float abs_diff = (diff >= 0.0f) ? diff : -diff;
+float si = 200.0f * abs_diff / denom;
+```
+
+**How to verify the fix is present in your build:**
+
+Run the digital twin UI in pathological mode (toggle "Simulate gait asymmetry") and switch to "Validate on embedded firmware" (Renode). All four profiles must report SI > 10%. If any profile reports SI ≈ 0% in pathological mode, the BUG-013 fix is not in the ELF.
+
+The pre-built ELF at `firmware/zephyr_sim_2026-03-28.elf` contains this fix and has been verified.
+
+### 2.4 Power Budget
 
 | Parameter | Simulated | Stage 5 target |
 |---|---|---|
-| Flash | 26.8 KB / 1 MB | — |
-| SRAM | 115.8 KB / 256 KB | — |
+| Flash | 37.4 KB / 1 MB (3.6%) | — |
+| SRAM | 118 KB / 256 KB (45.2%) | — |
 | Active current | ≈ 1.1 mA | ≤ 1.5 mA |
 | Sleep current | ≈ 5 µA | ≤ 5 µA |
 | FIFO idle interval | 153.85 ms (32 ÷ 208 Hz) | ≈ 154 ms |
@@ -530,7 +584,9 @@ python scripts/test_slope_100.py
 python scripts/test_stairs_100.py
 ```
 
-Requires Renode 1.16.1 on PATH and built ELF at `.pio/build/xiaoble_sense_sim/zephyr/zephyr.elf`.
+A pre-built validated ELF is at `firmware/zephyr_sim_2026-03-28.elf` — no PlatformIO toolchain needed to run these scripts. The bridge auto-detects it.
+
+If you have built locally, the bridge prefers `.pio/build/xiaoble_sense_sim/zephyr/zephyr.elf` over the pre-built ELF. Requires Renode 1.16.1 on PATH.
 
 ---
 
@@ -540,7 +596,7 @@ Requires Renode 1.16.1 on PATH and built ELF at `.pio/build/xiaoble_sense_sim/ze
 |---|---|
 | `docs/hw_bom.md` | Full BOM — part numbers, suppliers, prices |
 | `docs/sw_bom.md` | Software dependencies and versions |
-| `docs/bug_receipt.md` | All 12 simulation bugs — symptom, root cause, fix, files changed; hardware porting watch list |
+| `docs/bug_receipt.md` | All 13 simulation bugs — symptom, root cause, fix, files changed; hardware porting watch list |
 | `docs/algorithm_hunting_stair_walker.md` | Stair failure mode investigation with signal plots |
 | `src/gait/step_detector.c` | Push-off primary step detector with ring-buffer heel-strike inference |
 | `src/gait/phase_segmenter.c` | Gait phase FSM — terrain-agnostic MID_STANCE gate |
@@ -548,4 +604,5 @@ Requires Renode 1.16.1 on PATH and built ELF at `.pio/build/xiaoble_sense_sim/ze
 | `src/ble/ble_gait_svc.c` | BLE GATT service — snapshot export |
 | `host_tool/download_session.py` | BLE host download tool |
 | `scripts/test_all_profiles_full.py` | Single-command full pipeline verification |
+| `firmware/zephyr_sim_2026-03-28.elf` | Pre-built validated ELF — BUG-013 fixed, all 4 profiles × healthy + pathological confirmed |
 | `boards/xiao_ble_sense.overlay` | Device tree — **update GPIO pins before standalone XIAO assembly** |
