@@ -479,6 +479,11 @@ def calibrate(samples: np.ndarray, n: int = 400) -> np.ndarray:
 # Full algorithm runner
 # ─────────────────────────────────────────────────────────────────────────────
 
+WARMUP_STEPS = 10   # first N step records are excluded from the rolling window
+                    # mirrors the Renode path's 450-sample stationary prefix which
+                    # lets the adaptive threshold history fill before snapshots begin
+
+
 def run(samples: np.ndarray,
         bias: np.ndarray | None = None
         ) -> tuple[list[StepEvent], list[SnapshotEvent], list[StepRecord]]:
@@ -513,6 +518,7 @@ def run(samples: np.ndarray,
     # The step detector and phase segmenter still run so the HP/LP filters
     # warm to the signal DC level, but no output is emitted.
     _cal_done = False
+    _warmup_count = 0   # counts records emitted post-calibration
 
     def on_step(ev: StepEvent):
         if not _cal_done:
@@ -521,7 +527,13 @@ def run(samples: np.ndarray,
         seg.on_heel_strike(ev)
 
     def on_record(rec: StepRecord):
+        nonlocal _warmup_count
         records.append(rec)
+        # Skip first WARMUP_STEPS records so the adaptive threshold history
+        # fills with real walking peaks before any snapshot is computed.
+        if _warmup_count < WARMUP_STEPS:
+            _warmup_count += 1
+            return
         win.add(rec)
 
     from terrain_aware_step_detector import (

@@ -137,7 +137,8 @@ if run_clicked:
         for w in _warns:
             st.warning(f"⚠️ {w.message}", icon="⚠️")
 
-results: dict[str, PipelineResult] | None = st.session_state.results
+from typing import Optional
+results: Optional[dict] = st.session_state.results
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Header
