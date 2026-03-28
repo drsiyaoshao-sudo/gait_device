@@ -658,4 +658,8 @@ Both failures share the same root cause: reliance on a precise short-duration ti
 
 Visible in the GUI algorithm comparison panel: toggle **"Show algorithm comparison"** + **"Simulate gait asymmetry (SI ≈ 25%)"** in algorithm simulation mode. The `bad_wear` dashed line (original) tracks below the `bad_wear` solid line (terrain-aware) — both above threshold, but the original underestimates the magnitude. On the embedded firmware path (Renode), the full quantitative difference is observable.
 
+---
+
+**The goal of this handoff is not to have the receiving engineer use Claude Code or any AI agent. The goal is that a stubborn old-school hardware fanatic can pick up this work, read the docs, run the simulation, flash the firmware, and independently replicate everything that Claude Code and the developer achieved together — using nothing but a terminal, a compiler, and their own hands.**
+
 
