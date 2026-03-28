@@ -545,4 +545,85 @@ Stage 5 — Hardware Deployment
 | Hardware flash | Irreversible within a session; no amount of simulation certainty removes this gate | Rule 7 |
 | Any new calibration constant proposed | One calibration per algorithmic iteration — human validates the physical derivation | Measurement Philosophy |
 
+---
+
+## Pathological Walker Validation — The Critical Proof-of-Concept (2026-03-28)
+
+**This is the session that validated the entire venture.**
+
+### What was done
+
+After all four healthy walkers were confirmed passing at Stage 3, the human requested a pathological simulation: inject a known 25% true SI asymmetry into all four walker profiles and verify the firmware running on a virtual Cortex-M4F correctly reports SI > 10% (the Robinson et al. clinical threshold).
+
+This required two new capabilities:
+1. **Python path warmup fix** (`gait_algorithm.py`): discard first 10 step records from the rolling window so the adaptive threshold history fills before snapshots begin — mirrors the Renode path's 450-sample stationary prefix. Without this fix, early snapshots on the Python path were inflated by a partially-warm threshold.
+2. **`si_stance_true_pct` wired into signal generation** (`walker_model.py`): the field existed but was metadata only. Now `_generate_step()` uses it to apply an alternating ±delta stance offset on odd/even steps. For 25% SI at 100 spm: delta = 25 × 360ms / 200 = 45ms. The affected limb (odd steps) gets +45ms; the reference limb (even steps) gets −45ms.
+3. **Pathological toggle in the UI** (`app.py`, `pipeline.py`): sidebar toggle applies `si_override=25.0` to all four profiles at runtime without modifying the profile definitions.
+
+### BUG-013 — VABS.F32 broken in Renode 1.16.1 (critical, now resolved)
+
+Running the pathological flat walker on Renode (firmware ELF on virtual nRF52840) produced **SI = 0.0% across all 9 snapshots** despite 100/100 steps detected.
+
+Diagnostic added to `rolling_window.c::emit_snapshot()` confirmed:
+```
+DBG_SNAP n_odd=9 n_even=10 stance_odd=482 stance_even=388
+SNAPSHOT step=9 si_stance=0.0%
+```
+
+The averaged odd/even stance durations were **482ms vs 388ms** — a 94ms difference, expected SI ≈ 21%. Yet the SNAPSHOT reported 0.0%.
+
+Root cause: `VABS.F32` (ARM FPU absolute value instruction) returns the wrong result in Renode 1.16.1 when applied to a computed FPU-register value (the result of a subtraction). `fabsf(m_odd - m_even)` returned ≈0 instead of 94.0. This is the same class of emulator bug as the previously documented `VSQRT.F32` failure (`step_detector.c`, BUG-013 in that file).
+
+Fix in `rolling_window.c::compute_si_x10()`:
+```c
+// Before (broken on Renode 1.16.1):
+float si = 200.0f * fabsf(m_odd - m_even) / denom;
+
+// After (correct on all targets):
+float diff = m_odd - m_even;
+float abs_diff = (diff >= 0.0f) ? diff : -diff;
+float si = 200.0f * abs_diff / denom;
+```
+The conditional compiles to `VCMP+branch`, avoiding the broken `VABS.F32` instruction.
+
+**Why this bug was invisible before this session:** Healthy walkers produce SI ≈ 0% — both the broken and correct computation agree. The bug only surfaces when there is real asymmetry. Without the pathological test, this would have shipped to hardware and reported SI = 0% for every patient, regardless of actual asymmetry.
+
+### Validated results — 2026-03-28
+
+**Healthy mode (true SI = 0%) — all on Renode:**
+
+| Profile | Steps | Final SI | Verdict |
+|---|---|---|---|
+| Flat | 100/100 | 1.9% | Correct: below 10% threshold ✓ |
+| Bad wear | 100/100 | 0.1% | Correct: below 10% threshold ✓ |
+| Stairs | 100/100 | 2.9% | Correct: below 10% threshold ✓ |
+| Slope 10° | 100/100 | 4.6% | Correct: below 10% threshold ✓ |
+
+*Non-zero healthy SI values are real: step_variability_ms noise creates small but genuine odd/even timing differences. Previously all reported 0.0% due to VABS.F32 bug masking all SI computation.*
+
+**Pathological mode (true SI = 25%) — all on Renode:**
+
+| Profile | Steps | Final SI | Verdict |
+|---|---|---|---|
+| Flat | 100/100 | 17.2% | True positive: above 10% threshold ✓ |
+| Bad wear | 100/100 | 23.8% | True positive: above 10% threshold ✓ |
+| Stairs | 100/100 | 19.3% | True positive: above 10% threshold ✓ |
+| Slope 10° | 100/100 | 22.6% | True positive: above 10% threshold ✓ |
+
+### Why this matters
+
+The SI computation in `compute_si_x10()` is the **only output** the clinical end-user sees. If it is silently zeroed by a hardware emulation bug, the device passes every simulation test and then reports normal gait for every patient it encounters on real hardware.
+
+This is the proof-of-concept working as designed:
+
+```
+Known failure mode (pathological asymmetry)
+    → injected into simulation
+    → firmware running on virtual silicon reported wrong answer (SI=0%)
+    → bug found and fixed before any hardware was fabricated
+    → firmware now correctly reports SI > 10% for 4/4 terrain profiles
+```
+
+No IMU. No nRF52840 board. No patient. Caught in software by injecting a physics-grounded signal and demanding a specific clinical output.
+
 

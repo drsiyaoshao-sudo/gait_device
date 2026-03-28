@@ -18,7 +18,7 @@ It never imports from gait_algorithm or renode_bridge directly.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Optional
 
 import numpy as np
@@ -102,6 +102,13 @@ def _renode_available(elf_path: Optional[str] = None) -> bool:
 # Pure Python path
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _apply_si_override(profile: WalkerProfile, si_override: Optional[float]) -> WalkerProfile:
+    """Return a copy of profile with si_stance_true_pct replaced, or the original."""
+    if si_override is None:
+        return profile
+    return replace(profile, si_stance_true_pct=si_override)
+
+
 def _run_python(
     profile: WalkerProfile,
     n_steps: int,
@@ -161,11 +168,12 @@ def _run_renode(
 # ─────────────────────────────────────────────────────────────────────────────
 
 def run_profile(
-    profile:    WalkerProfile,
-    n_steps:    int  = 200,
-    seed:       int  = 42,
-    use_renode: bool = False,
-    elf_path:   Optional[str] = None,
+    profile:     WalkerProfile,
+    n_steps:     int   = 200,
+    seed:        int   = 42,
+    use_renode:  bool  = False,
+    elf_path:    Optional[str]   = None,
+    si_override: Optional[float] = None,
 ) -> PipelineResult:
     """
     Run a single walker profile through the simulation pipeline.
@@ -184,13 +192,12 @@ def run_profile(
     elf_path : str | None
         Override path to firmware.elf (Renode path only).
     """
+    profile = _apply_si_override(profile, si_override)
     if use_renode:
         if _renode_available(elf_path):
             try:
                 return _run_renode(profile, n_steps, seed, elf_path)
             except Exception as exc:
-                # Renode integration is Stage 3 work; fall back to Python path
-                # and surface the error to the caller as a warning, not a crash.
                 import warnings
                 warnings.warn(
                     f"Renode run failed for profile '{profile.name}': {exc!r}. "
@@ -203,15 +210,22 @@ def run_profile(
 
 
 def run_all_profiles(
-    n_steps:    int  = 200,
-    seed:       int  = 42,
-    use_renode: bool = False,
-    elf_path:   Optional[str] = None,
+    n_steps:     int   = 200,
+    seed:        int   = 42,
+    use_renode:  bool  = False,
+    elf_path:    Optional[str]   = None,
+    si_override: Optional[float] = None,
+    profile_keys: Optional[list] = None,
 ) -> dict[str, PipelineResult]:
-    """Run all walker profiles and return results keyed by profile name."""
+    """Run walker profiles and return results keyed by profile name.
+
+    profile_keys: subset of PROFILES to run; defaults to all.
+    si_override:  if set, overrides si_stance_true_pct on every profile.
+    """
+    keys = profile_keys if profile_keys is not None else list(PROFILES.keys())
     return {
-        key: run_profile(p, n_steps, seed, use_renode, elf_path)
-        for key, p in PROFILES.items()
+        key: run_profile(PROFILES[key], n_steps, seed, use_renode, elf_path, si_override)
+        for key in keys
     }
 
 

@@ -24,7 +24,12 @@ static uint16_t compute_si_x10(float m_odd, float m_even)
 {
     float denom = m_odd + m_even;
     if (denom < 1e-6f) return 0;
-    float si = 200.0f * fabsf(m_odd - m_even) / denom;
+    /* Avoid fabsf() — VABS.F32 is broken in Renode 1.16.1 (returns wrong result
+     * for FPU-register inputs, same class of bug as VSQRT.F32 in step_detector.c).
+     * Use a conditional instead, which compiles to VCMP+branch and is correct. */
+    float diff = m_odd - m_even;
+    float abs_diff = (diff >= 0.0f) ? diff : -diff;
+    float si = 200.0f * abs_diff / denom;
     /* Clamp to [0, 200] and convert to ×10 */
     if (si > 200.0f) si = 200.0f;
     return (uint16_t)(si * 10.0f + 0.5f);

@@ -44,6 +44,8 @@ WALKER_COLORS = {
     "slope":    "#9C27B0",   # purple
 }
 
+DISPLAY_PROFILES = ["flat", "bad_wear", "stairs", "slope"]
+
 SI_CLINICAL_THRESHOLD = 10.0   # Robinson et al. 1987
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -64,9 +66,17 @@ profile_labels = {
 
 selected_key = st.sidebar.selectbox(
     "Detail view",
-    options=list(profile_labels.keys()),
+    options=DISPLAY_PROFILES,
     format_func=lambda k: profile_labels[k],
 )
+
+pathological = st.sidebar.toggle(
+    "Pathological asymmetry (SI ≈ 25%)",
+    value=False,
+    help="Inject a 25% true SI into all four profiles by alternating "
+         "odd/even stance duration. Healthy walkers show SI ≈ 0%.",
+)
+si_override = 25.0 if pathological else None
 
 n_steps = st.sidebar.slider("Steps to simulate", min_value=50, max_value=500,
                              value=200, step=50)
@@ -121,6 +131,8 @@ if "n_steps_run" not in st.session_state:
     st.session_state.n_steps_run = 0
 if "via_renode" not in st.session_state:
     st.session_state.via_renode = False
+if "pathological" not in st.session_state:
+    st.session_state.pathological = False
 
 if run_clicked:
     _label = "Running Renode simulation for all 4 walkers..." if use_renode \
@@ -130,10 +142,12 @@ if run_clicked:
         with warnings.catch_warnings(record=True) as _warns:
             warnings.simplefilter("always")
             st.session_state.results = run_all_profiles(
-                n_steps=n_steps, seed=int(seed), use_renode=use_renode
+                n_steps=n_steps, seed=int(seed), use_renode=use_renode,
+                si_override=si_override, profile_keys=DISPLAY_PROFILES,
             )
         st.session_state.n_steps_run = n_steps
         st.session_state.via_renode = use_renode
+        st.session_state.pathological = pathological
         for w in _warns:
             st.warning(f"⚠️ {w.message}", icon="⚠️")
 
@@ -164,10 +178,16 @@ if results is None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 st.subheader("Detected Symmetry Index — All Walkers")
-st.caption(
-    f"Clinical threshold: SI > {SI_CLINICAL_THRESHOLD}% = asymmetric. "
-    "True SI = 0% for all walkers. Any reading above threshold is a false positive."
-)
+if st.session_state.pathological:
+    st.caption(
+        f"Clinical threshold: SI > {SI_CLINICAL_THRESHOLD}% = asymmetric. "
+        "**Pathological mode:** true SI = 25% for all walkers. Readings above threshold are true positives."
+    )
+else:
+    st.caption(
+        f"Clinical threshold: SI > {SI_CLINICAL_THRESHOLD}% = asymmetric. "
+        "**Healthy mode:** true SI = 0% for all walkers. Any reading above threshold is a false positive."
+    )
 
 fig_si = go.Figure()
 

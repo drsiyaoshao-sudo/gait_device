@@ -139,6 +139,20 @@ PROFILES: dict[str, WalkerProfile] = {
         stance_frac=0.62,
         step_variability_ms=18,
     ),
+    "high_si": WalkerProfile(
+        name="Walker 5 — High SI (pathological asymmetry, flat)",
+        terrain="flat",
+        cadence_spm=100,
+        step_length_m=0.70,
+        vertical_oscillation_cm=4.0,
+        slope_deg=0.0,
+        stance_frac=0.60,
+        step_variability_ms=10,
+        # True SI ≈ 25%: affected limb (odd steps) stance ~+43ms longer than reference.
+        # Derived: delta = 25 * (0.60 * 600ms) / 200 = 45ms alternating offset.
+        # Clinical reference: Robinson et al. threshold = 10%; 25% = moderate pathology.
+        si_stance_true_pct=25.0,
+    ),
 }
 
 
@@ -168,7 +182,14 @@ def _generate_step(
 
     # Per-step duration variability
     step_period_s   = 60.0 / profile.cadence_spm
-    stance_dur_s    = step_period_s * profile.stance_frac + rng.normal(0, profile.step_variability_ms / 1000)
+    stance_nom_s    = step_period_s * profile.stance_frac
+
+    # True asymmetry: si_stance_true_pct drives an alternating ±delta on
+    # odd/even steps.  Derived from SI = 200*delta/stance_nom → delta = SI*nom/200.
+    # Odd steps are the "affected" limb (longer stance); even steps are the reference.
+    delta_s = profile.si_stance_true_pct * stance_nom_s / 200.0
+    sign    = +1 if (step_idx % 2 == 1) else -1
+    stance_dur_s    = stance_nom_s + sign * delta_s + rng.normal(0, profile.step_variability_ms / 1000)
     swing_dur_s     = step_period_s * (1 - profile.stance_frac) + rng.normal(0, profile.step_variability_ms * 0.5 / 1000)
     stance_dur_s    = max(stance_dur_s, 0.10)
     swing_dur_s     = max(swing_dur_s,  0.08)
