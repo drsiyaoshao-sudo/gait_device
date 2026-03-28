@@ -14,4 +14,15 @@ config GAIT_RENODE_SIM
 	  pre-written float32 samples from /tmp/gait_imu_sim.f32.
 	  Also skips BLE init and NVS calibration.
 
+config GAIT_UART_EXPORT
+	bool "UART binary snapshot export for BLE simulation"
+	default n
+	depends on GAIT_RENODE_SIM
+	help
+	  After the session completes, dump all rolling_snapshot_t structs as
+	  hex-encoded lines over UART (BLE_BINARY_START / 40-hex-char lines /
+	  BLE_BINARY_END) before SESSION_END. Used in Renode simulation to
+	  validate the BLE GATT export data pipeline without requiring a BLE
+	  radio. Must NEVER be flashed to physical hardware.
+
 source "Kconfig.zephyr"

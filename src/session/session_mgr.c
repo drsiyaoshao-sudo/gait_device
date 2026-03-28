@@ -1,10 +1,12 @@
 #include "session_mgr.h"
 #include "snapshot_buffer.h"
 #include "../gait/gait_engine.h"
+#include "../gait/rolling_window.h"
 #include "../imu/calibration.h"
 #include <kernel.h>
 #include <drivers/gpio.h>
 #include <logging/log.h>
+#include <sys/printk.h>
 
 #ifdef CONFIG_GAIT_RENODE_SIM
 /* Declared in imu_sim_reader.c — set true when all stub samples consumed. */
@@ -52,6 +54,46 @@ static void on_snapshot(const rolling_snapshot_t *snap)
 {
     snapshot_buffer_push(snap);
 }
+
+/* ------------------------------------------------------------------ */
+/* UART binary export (CONFIG_GAIT_UART_EXPORT=y — sim only)           */
+/* Serialises every rolling_snapshot_t in snapshot_buffer as a hex-    */
+/* encoded line so the text-mode UART log can carry the binary payload. */
+/* Python unpacks with signal_analysis.parse_binary_export_log().      */
+/* Format:                                                              */
+/*   BLE_BINARY_START count=N\n                                        */
+/*   <40 hex chars per snapshot = 20 bytes little-endian>\n            */
+/*   ...                                                                */
+/*   BLE_BINARY_END\n                                                   */
+/* ------------------------------------------------------------------ */
+#ifdef CONFIG_GAIT_UART_EXPORT
+static const char _hex_chars[] = "0123456789abcdef";
+
+static void uart_export_snapshots(void)
+{
+    uint32_t n = snapshot_buffer_count();
+    printk("BLE_BINARY_START count=%u\n", n);
+
+    for (uint32_t i = 0; i < n; i++) {
+        rolling_snapshot_t snap;
+        if (snapshot_buffer_read(i, &snap) != 0) { break; }
+
+        const uint8_t *b = (const uint8_t *)&snap;
+        /* One printk per snapshot — 40 hex chars + newline.
+         * Building the string locally avoids 20 separate UART DMA
+         * transfers (each going through the watchpoint IRQ path). */
+        char hex[41];
+        for (int j = 0; j < (int)sizeof(snap); j++) {
+            hex[j * 2]     = _hex_chars[(b[j] >> 4) & 0xF];
+            hex[j * 2 + 1] = _hex_chars[ b[j]       & 0xF];
+        }
+        hex[40] = '\0';
+        printk("%s\n", hex);
+    }
+
+    printk("BLE_BINARY_END\n");
+}
+#endif /* CONFIG_GAIT_UART_EXPORT */
 
 /* ------------------------------------------------------------------ */
 /* LED thread                                                           */
@@ -124,6 +166,17 @@ static void session_thread_fn(void *a, void *b, void *c)
     gait_engine_session_stop();
     state = SESSION_COMPLETE;
     LOG_INF("Sim session complete — %u steps", gait_engine_step_count());
+
+#ifdef CONFIG_GAIT_UART_EXPORT
+    /* Binary export before SESSION_END so all data lands in the UART
+     * log before the sentinel fires and the bridge terminates Renode. */
+    uart_export_snapshots();
+#endif
+
+    /* SESSION_END is the UART sentinel that signals bridge termination.
+     * Must be the last line emitted — gait_engine_session_stop() no
+     * longer prints it so the export above can precede it. */
+    printk("SESSION_END steps=%u\n", gait_engine_step_count());
 
     /* Park the session thread. */
     while (1) {

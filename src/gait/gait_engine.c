@@ -67,7 +67,9 @@ void gait_engine_session_stop(void)
 {
     session_active = false;
     LOG_INF("Session stopped — total steps: %u", step_count);
-    printk("SESSION_END steps=%u\n", step_count);
+    /* SESSION_END is emitted by the caller (session_mgr.c) so that
+     * optional post-session exports (CONFIG_GAIT_UART_EXPORT) can
+     * complete before the UART sentinel fires. */
 }
 
 uint32_t gait_engine_step_count(void)
