@@ -487,4 +487,62 @@ The key structural difference from pure software: **staging and production are p
 | `git blame` | CLAUDE.md stage records + bug receipt — traces every threshold and design decision to a human confirmation |
 | Rollback plan | Three-strike rule (Rule 5) — after 3 failed attempts, stop and escalate rather than compound technical debt |
 
+---
+
+## Agentic Co-Design Flow — Human vs. Agent Responsibilities
+
+The agent runs the simulation loop autonomously. The human owns every decision that changes the physical or algorithmic direction of the project. The boundary is: **agent executes, human decides.**
+
+```
+Stage 1 — Firmware
+  [AGENT]  Write C firmware files (step_detector, phase_segmenter, rolling_window, session_mgr)
+  [AGENT]  Run PlatformIO native unit tests, report pass/fail
+  [HUMAN]  Review failing tests — decide whether to fix firmware or accept known limitation
+  [HUMAN]  Confirm Stage 1 exit criteria met before proceeding
+
+Stage 2 — Software
+  [AGENT]  Write Python simulator (walker_model, signal_analysis, renode_bridge)
+  [AGENT]  Run pytest simulator/tests/, report pass/fail
+  [HUMAN]  Review any test failures — confirm fix direction
+  [HUMAN]  Confirm Stage 2 exit criteria met before proceeding
+
+Stage 3 — Simulation
+  [AGENT]  Build ELF (two-step ninja), launch Renode, run all profiles, parse UART output
+  [AGENT]  Generate signal plots after any walker_model or algorithm change
+  [HUMAN]  *** MANDATORY: review signal plots — confirm physical plausibility before trusting SI output ***
+  [AGENT]  Print intermediate snapshot tables to console after each profile run
+  [HUMAN]  *** MANDATORY: review console results — explicitly confirm or redirect before next action ***
+  [AGENT]  Propose algorithm fix domain (filtering / feature extraction / hardware change)
+  [HUMAN]  *** MANDATORY: select exactly one domain to pursue (Rule 8) — agent must not self-select ***
+  [AGENT]  Implement fix, re-run all profiles, check regression
+  [HUMAN]  If three attempts fail (Rule 5): agent stops, human determines next step
+  [HUMAN]  Confirm Stage 3 exit criteria met before proceeding
+
+Stage 4 — Edge Cases
+  [AGENT]  Write and run edge case unit tests (zero-step, saturation, mounting offset, etc.)
+  [AGENT]  Run Renode under adversarial inputs, report any fault or assertion
+  [HUMAN]  Review edge case failures — decide accept / fix / defer to hardware
+  [HUMAN]  Confirm Stage 4 exit criteria met before proceeding
+
+Stage 5 — Hardware Deployment
+  [HUMAN]  *** MANDATORY: approve ELF flash — irreversible, no agent autonomy here ***
+  [AGENT]  Provide flash command and bring-up checklist; record RTT/UART output
+  [HUMAN]  Execute bench bring-up sequence (WHO_AM_I, calibration, 100-step walk)
+  [HUMAN]  Compare hardware results to simulation predictions in docs/handoff.md
+  [HUMAN]  Declare Stage 5 pass/fail; file any new hardware porting bugs
+```
+
+### Decision Gates — When the Agent Must Stop and Wait
+
+| Trigger | Why human must decide | Rule |
+|---|---|---|
+| Signal plot generated after any model/algorithm change | Agent cannot judge physical plausibility of a biomechanical signal | Learner-in-the-loop |
+| Console results printed after a simulation run | Intermediate data may reveal a direction the agent cannot infer | Rule in Measurement Philosophy |
+| Algorithm search domain exhausted with no fix | Choosing between filtering / feature extraction / hardware is a design tradeoff, not a computation | Rule 8 |
+| Three consecutive failed fix attempts | Continuing compounds token debt and masks the real root cause | Rule 5 |
+| Stage N → Stage N+1 transition | Exit criteria require explicit human confirmation — never assumed | Rule 3 |
+| BOM change opportunity identified | Cost vs. capability tradeoff is a business decision, not an engineering computation | Rule 9 |
+| Hardware flash | Irreversible within a session; no amount of simulation certainty removes this gate | Rule 7 |
+| Any new calibration constant proposed | One calibration per algorithmic iteration — human validates the physical derivation | Measurement Philosophy |
+
 
