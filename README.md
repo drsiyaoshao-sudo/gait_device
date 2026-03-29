@@ -7,6 +7,54 @@ Hardware: Seeed XIAO nRF52840 Sense — nRF52840 Cortex-M4F + LSM6DS3TR-C 6-DOF 
 
 ---
 
+## The Workflow
+
+This project runs under a constitutional governance model that functions as a natural CI/CD system. Understanding it before touching any code will save you significant time.
+
+### The Constitution
+
+Two unconditional rules govern everything:
+
+**Article I — Physics First.** No signal, threshold, gate, or parameter may be defined unless it traces to one of three first-order physical quantities: Vertical Oscillation (cm), Cadence (steps/min), or Step Length (m). IMU axis values are projections of these onto a sensor frame — not primitives themselves.
+
+**Article II — Learner-in-the-Loop.** An agent executes. A human decides. Any action whose consequence cannot be fully reversed by a single `git revert` requires human approval before execution. Empirical evidence — signal plots, UART output, test results — is the only valid input to a decision.
+
+Full constitutional document: [CLAUDE.md](CLAUDE.md)
+
+### The Four Branches
+
+| Branch | Role | Maps to CI/CD |
+|--------|------|---------------|
+| **Bureaucracy** | Executes established procedures autonomously — builds, test runs, package installs, plot generation, commits | CI runner — deterministic, same procedure every time, no human in the loop |
+| **Legislature** | Proposes any new change (algorithm, firmware, simulation, hardware) as a formal Bill with physical evidence | PR with mandatory template — no merge without evidence and measurable expected outcome |
+| **Judiciary** | Resolves conflicts between rules; approves or rejects Bills; rulings are binding precedent | Code review gate — but grounded in empirical evidence, not opinion |
+| **Amendment Ratification** | Adds new governance rules via >60% supermajority vote | RFC / ADR process — governance changes require explicit ratification, not just a committer with write access |
+
+### The Key Files
+
+```
+CLAUDE.md                                    ← The Constitution (stable; read this first)
+docs/gaitsense_code/amendments.md            ← 14 ratified operational rules
+docs/gaitsense_code/case_law.md              ← 5 binding precedents (settled questions)
+docs/executive_branch_document/handoff.md    ← Stage gate records and hardware predictions
+docs/executive_branch_document/bug_receipt.md ← Permanent bug record
+```
+
+### How a Change Gets Made
+
+1. **Routine work** (build, test, plot, commit): proceed directly under a Bureaucracy Standing Order — no approval required.
+2. **New behaviour** (algorithm change, new threshold, new profile): file a Bill with physical evidence and expected measurable outcome. Debate with the Judiciary. Human presides.
+3. **Conflicting rules**: declare a Judicial Hearing. Two positions are argued from the amendments and case law. Human rules. Ruling is recorded in `docs/gaitsense_code/case_law.md` before any implementation.
+4. **New governance rule**: propose a new Amendment. Agents argue for and against. Human ratifies (or not). Takes effect immediately on ratification.
+
+### Why It Works
+
+The critical case: BUG-013. A silently-zeroed SI computation would have shipped to hardware reporting "perfect symmetry" for every patient. It was caught not by a green test suite, but by the constitutional requirement (now Amendment 4 + VABS.F32 Case Law) that any clinical-output computation must be tested under inputs where the correct answer is *non-zero*. No conventional CI/CD pipeline would have caught this. The governance structure caught it.
+
+The constitutional model was built first. CI/CD fell out of it as the Bureaucracy's standing orders.
+
+---
+
 ## Table of Contents
 
 1. [Quick Start — Simulator Only (no hardware)](#1-quick-start--simulator-only-no-hardware)
@@ -16,8 +64,7 @@ Hardware: Seeed XIAO nRF52840 Sense — nRF52840 Cortex-M4F + LSM6DS3TR-C 6-DOF 
 5. [Hardware Deployment](#5-hardware-deployment)
 6. [Project Structure](#6-project-structure)
 7. [Known Bugs and Resolutions](#7-known-bugs-and-resolutions)
-8. [Why This Approach Works](#8-why-this-approach-works)
-9. [BOMs](#9-boms)
+8. [BOMs](#8-boms)
 
 ---
 
@@ -94,7 +141,7 @@ pio run -e xiaoble_sense
 
 This build enables BLE GATT export. Snapshots are delivered as GATT notifications. Use `host_tool/download_session.py` to download sessions over BLE.
 
-> **Note:** The production build (`xiaoble_sense`) has not been separately validated on hardware as of the last simulation session (2026-03-28). The simulation build (`xiaoble_sense_sim`) is the fully validated path. For hardware bring-up, build `xiaoble_sense` but cross-check behaviour against the simulation predictions in [CLAUDE.md](CLAUDE.md).
+> **Note:** The production build (`xiaoble_sense`) has not been separately validated on hardware as of the last simulation session (2026-03-28). The simulation build (`xiaoble_sense_sim`) is the fully validated path. For hardware bring-up, build `xiaoble_sense` but cross-check behaviour against the simulation predictions in [docs/executive_branch_document/handoff.md](docs/executive_branch_document/handoff.md).
 
 ---
 
@@ -214,7 +261,7 @@ If you later build your own ELF (see Section 2a), the locally-built version take
 
 ## 5. Hardware Deployment
 
-> **Stage gate:** Do not proceed to hardware until all simulation exit criteria in [CLAUDE.md](CLAUDE.md) Stage 3 are confirmed met. As of 2026-03-28, Stage 3 is complete. Stage 4 (edge cases) is open.
+> **Stage gate:** Do not proceed to hardware until all simulation exit criteria in [docs/executive_branch_document/handoff.md](docs/executive_branch_document/handoff.md) are confirmed met. As of 2026-03-28, Stage 3 is complete. Stage 4 (edge cases) is open.
 
 ### 5a. Flash firmware
 
@@ -259,12 +306,14 @@ The tool connects to the first GaitSense device found, subscribes to snapshot no
 
 ```
 gait_device/
-├── CLAUDE.md                    # Dev philosophy, stage exit criteria, bug hunt log
-├── README.md                    # This file — human deployment guide
+├── CLAUDE.md                    # The Constitution — read before touching anything
+├── README.md                    # This file — entry point and deployment guide
 ├── platformio.ini               # Build environments (xiaoble_sense, xiaoble_sense_sim, native)
 ├── prj.conf                     # Zephyr Kconfig — production build
 ├── prj_sim.conf                 # Zephyr Kconfig — simulation build (CONFIG_GAIT_UART_EXPORT=y)
 ├── CMakeLists.txt
+├── firmware/
+│   └── zephyr_sim_2026-03-28.elf   # Pre-built validated sim ELF (BUG-013 fixed)
 ├── src/
 │   ├── main.c
 │   ├── imu/
@@ -297,28 +346,34 @@ gait_device/
 │   └── sim_uart_stub.py         # UARTE0 DMA capture; TXSTOPPED semaphore fix
 ├── test/
 │   └── native/
-│       ├── test_step_detector.c # 3 tests: detect, miss, adaptive threshold
+│       ├── test_step_detector.c  # 3 tests: detect, miss, adaptive threshold
 │       ├── test_rolling_window.c # 5 tests: SI=0, SI alternating, window wrap, cadence, prior seed
-│       └── test_foot_angle.c    # 3 tests: static angle, drift 1s, reset
+│       └── test_foot_angle.c     # 3 tests: static angle, drift 1s, reset
 ├── scripts/
-│   ├── test_flat_only.py        # Renode: flat walker 100 steps → PASS
-│   ├── test_stairs_100.py       # Renode: stair walker 100 steps → PASS (was 0/100 pre-fix)
-│   └── test_slope_100.py        # Renode: slope walker 100 steps → PASS
+│   ├── test_flat_only.py         # Renode: flat walker 100 steps → PASS
+│   ├── test_stairs_100.py        # Renode: stair walker 100 steps → PASS (was 0/100 pre-fix)
+│   └── test_slope_100.py         # Renode: slope walker 100 steps → PASS
 ├── host_tool/
-│   └── download_session.py      # BLE session download → CSV
+│   └── download_session.py       # BLE session download → CSV
 └── docs/
-    ├── hw_bom.md                # Hardware bill of materials (~$45–50)
-    ├── sw_bom.md                # Software bill of materials (all open-source except SEGGER tools)
-    ├── handoff.md               # Stage 4/5 handoff checklist for physical validator
-    ├── bug_receipt.md           # Permanent bug record (symptom, root cause, fix, files)
-    └── algorithm_hunting_stair_walker.md  # Full hunting procedure for BUG-010
+    ├── gaitsense_code/
+    │   ├── amendments.md         # 14 ratified operational rules (traces to Articles)
+    │   └── case_law.md           # 5 binding precedents (settled questions — do not re-litigate)
+    └── executive_branch_document/
+        ├── handoff.md            # Stage gate records and hardware predictions
+        ├── bug_receipt.md        # Permanent bug record (symptom, root cause, fix, files)
+        ├── hw_bom.md             # Hardware bill of materials (~$45–50)
+        ├── sw_bom.md             # Software bill of materials (all open-source except SEGGER tools)
+        ├── algorithm_hunting_stair_walker.md  # Full hunting procedure for BUG-010
+        ├── plots/                # Signal diagnostic plots referenced by case law
+        └── reports/              # Simulation validation reports
 ```
 
 ---
 
 ## 7. Known Bugs and Resolutions
 
-All bugs discovered during simulation are resolved before hardware handoff. The table below is the complete record. See [docs/executive_branch_document/bug_receipt.md](docs/executive_branch_document/bug_receipt.md) for full symptom → root cause → fix detail on each.
+All bugs discovered during simulation are resolved before hardware handoff. See [docs/executive_branch_document/bug_receipt.md](docs/executive_branch_document/bug_receipt.md) for full symptom → root cause → fix detail on each.
 
 ### Summary
 
@@ -413,19 +468,7 @@ ninja app/libapp.a && ninja zephyr/zephyr.elf
 
 ---
 
-## 8. Why This Approach Works
-
-This project was built from zero to a validated embedded gait algorithm — including discovery and fix of a critical clinical safety bug (BUG-013) — without fabricating any hardware.
-
-The key structural principle: **every signal the firmware sees is derived from three first-order physical quantities** (vertical oscillation, cadence, step length), not injected as raw axis values. This means the simulation is a physics test, not a signal playback. When the stair walker produced 0 detected steps, the signal plots immediately showed the biomechanical reason — a 135 ms timing gap that breaks a 40 ms window assumption. No hardware was needed to make this visible.
-
-The secondary principle: **the firmware ELF that runs in Renode is the same binary that gets flashed to the XIAO.** There is no mock, no stub, no model of the algorithm. If a failure mode appears in simulation, it will appear on hardware. If it is resolved in simulation, it is resolved on hardware.
-
-BUG-013 is the proof: a silently-zeroed SI computation that would have shipped as a device reporting "perfect symmetry" for every patient was caught by running a single pathological walker (25% true SI) through the firmware on a virtual Cortex-M4F. No IMU. No patient. No hospital corridor.
-
----
-
-## 9. BOMs
+## 8. BOMs
 
 - [Hardware BOM](docs/executive_branch_document/hw_bom.md) — ~$45–50, Seeed XIAO nRF52840 Sense + perfboard assembly
 - [Software BOM](docs/executive_branch_document/sw_bom.md) — full open-source stack; SEGGER tools free for non-commercial use
