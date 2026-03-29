@@ -310,13 +310,13 @@ All values within ±30ms of ground truth — clinically acceptable.
 - [x] Python validation: `TerrainAwareStepDetector` extended with ring buffer
 - [x] Python tests pass for Option C stance/swing — 18/18
 - [x] Human reviews `docs/plots/option_c_stance_swing_accuracy.png`
-- [ ] Port Option C to `src/gait/step_detector.c` — add 8-entry ring buffer, no contract change
-- [ ] Rebuild firmware ELF
-- [ ] Run all 4 profiles through Renode (`test_all_profiles.py` + stairs at 100 steps)
-- [ ] Confirm stairs ≥ 95/100 steps and SI < 3% in bare-metal simulation
-- [ ] Confirm phase segmenter stance/swing durations within ±20ms of ground truth (all 4 profiles)
-- [ ] Update `memory/bugs.md` — BUG-010 status: RESOLVED
-- [ ] Commit and push
+- [x] Port Option C to `src/gait/step_detector.c` — add 8-entry ring buffer, no contract change
+- [x] Rebuild firmware ELF
+- [x] Run all 4 profiles through Renode (`test_all_profiles.py` + stairs at 100 steps)
+- [x] Confirm stairs ≥ 95/100 steps and SI < 3% in bare-metal simulation
+- [x] Confirm phase segmenter stance/swing durations within ±20ms of ground truth (all 4 profiles)
+- [x] Update `memory/bugs.md` — BUG-010 status: RESOLVED
+- [x] Commit and push
 
 ---
 
