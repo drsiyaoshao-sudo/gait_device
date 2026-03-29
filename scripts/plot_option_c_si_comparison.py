@@ -8,7 +8,7 @@ Option C         : terrain-aware + ring-buffer heel-strike inference
 
 All three use identical filter chains and adaptive threshold.
 
-Saved to docs/plots/option_c_si_comparison.png
+Saved to docs/executive_branch_document/plots/option_c_si_comparison.png
 """
 
 import sys, math
@@ -275,6 +275,6 @@ for i, key in enumerate(PROFILES_ORDER):
                  transform=ax2.get_xaxis_transform())
 
 plt.tight_layout()
-out = "docs/plots/option_c_si_comparison.png"
+out = "docs/executive_branch_document/plots/option_c_si_comparison.png"
 plt.savefig(out, dpi=150)
 print(f"Saved → {out}")

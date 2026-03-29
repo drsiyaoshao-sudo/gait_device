@@ -2,7 +2,7 @@
 Full work report — Gait Device Simulation Bench to Option C Validation.
 Generates a multi-page PDF with embedded plots and narrative text.
 
-Output: docs/reports/gait_simulation_report_2026-03-27.pdf
+Output: docs/executive_branch_document/reports/gait_simulation_report_2026-03-27.pdf
 """
 
 import sys, math, textwrap
@@ -21,10 +21,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "simulator"))
 from walker_model import PROFILES, generate_imu_sequence
 from terrain_aware_step_detector import TerrainAwareStepDetector, ODR_HZ
 
-Path("docs/reports").mkdir(parents=True, exist_ok=True)
+Path("docs/executive_branch_document/reports").mkdir(parents=True, exist_ok=True)
 
-PLOT_DIR  = Path("docs/plots")
-OUT_PDF   = Path("docs/reports/gait_simulation_report_2026-03-27.pdf")
+PLOT_DIR  = Path("docs/executive_branch_document/plots")
+OUT_PDF   = Path("docs/executive_branch_document/reports/gait_simulation_report_2026-03-27.pdf")
 
 # ── Colour palette ────────────────────────────────────────────────────────────
 C_BLUE   = "#1565C0"
@@ -515,8 +515,8 @@ with PdfPages(OUT_PDF) as pdf:
     text_page(fig, "11. Next Steps — C Port and Renode Validation", [
         ("Stage 2 Status: COMPLETE (pending human sign-off on Option C plots)",
          "All Python signal-level exit criteria met.\n"
-         "Human checkpoint: review docs/plots/option_c_stance_swing_accuracy.png\n"
-         "                  review docs/plots/option_c_si_comparison.png\n"
+         "Human checkpoint: review docs/executive_branch_document/plots/option_c_stance_swing_accuracy.png\n"
+         "                  review docs/executive_branch_document/plots/option_c_si_comparison.png\n"
          "Sign-off required before C port begins (per CLAUDE.md learner-in-the-loop protocol)."),
 
         ("C Port — src/gait/step_detector.c (Option C only, surgical change)",
@@ -552,8 +552,8 @@ with PdfPages(OUT_PDF) as pdf:
          "scripts/plot_swing_stance_comparison.py      Architectural impact analysis\n"
          "scripts/plot_option_c_stance_swing.py        Option C stance/swing accuracy\n"
          "scripts/plot_option_c_si_comparison.py       Three-algorithm SI comparison\n"
-         "docs/algorithm_hunting_stair_walker.md       Full hunting procedure + decisions\n"
-         "docs/reports/gait_simulation_report_2026-03-27.pdf  This report"),
+         "docs/executive_branch_document/algorithm_hunting_stair_walker.md       Full hunting procedure + decisions\n"
+         "docs/executive_branch_document/reports/gait_simulation_report_2026-03-27.pdf  This report"),
     ])
     pdf.savefig(fig, bbox_inches="tight")
     plt.close(fig)

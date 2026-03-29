@@ -284,6 +284,6 @@ ax4.text(0.5, 0.08,
     bbox=dict(boxstyle="round,pad=0.4", facecolor="#FFEBEE", edgecolor="#EF9A9A"))
 
 plt.tight_layout()
-out = "docs/plots/swing_stance_comparison.png"
+out = "docs/executive_branch_document/plots/swing_stance_comparison.png"
 plt.savefig(out, dpi=150)
 print(f"Saved → {out}")

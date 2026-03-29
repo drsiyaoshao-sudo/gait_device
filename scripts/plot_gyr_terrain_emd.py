@@ -17,7 +17,7 @@ Shows:
               flat/slope/bad_wear: early crossing, gap < 40ms → PASS
               stairs: push-off crossing, gap >> 40ms → TIMEOUT
 
-Saved to docs/plots/gyr_emd_terrain_comparison.png
+Saved to docs/executive_branch_document/plots/gyr_emd_terrain_comparison.png
 """
 
 import sys
@@ -302,6 +302,6 @@ for i, key in enumerate(WALKER_ORDER):
 ax4.set_ylim(bottom=0)
 
 plt.tight_layout(rect=[0, 0, 1, 0.96])
-out_path = "docs/plots/gyr_emd_terrain_comparison.png"
+out_path = "docs/executive_branch_document/plots/gyr_emd_terrain_comparison.png"
 plt.savefig(out_path, dpi=150)
 print(f"\nSaved → {out_path}")

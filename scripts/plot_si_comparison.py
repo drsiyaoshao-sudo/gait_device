@@ -9,7 +9,7 @@ Procedure (per CLAUDE.md learner-in-the-loop):
 Standard algorithm  → mirrors step_detector.c (acc-primary, 40ms gyr_y confirm)
 Terrain-aware algo  → TerrainAwareStepDetector (gyr_y_hp push-off, acc confirm)
 
-Saved to docs/plots/si_comparison_standard_vs_terrain.png
+Saved to docs/executive_branch_document/plots/si_comparison_standard_vs_terrain.png
 """
 
 import sys, math
@@ -281,7 +281,7 @@ for i, key in enumerate(PROFILES_ORDER):
                  transform=ax2.get_xaxis_transform())
 
 plt.tight_layout()
-out = "docs/plots/si_comparison_standard_vs_terrain.png"
+out = "docs/executive_branch_document/plots/si_comparison_standard_vs_terrain.png"
 plt.savefig(out, dpi=150)
 print(f"\nSaved → {out}")
 print("\nHuman review required. If plots confirm:")

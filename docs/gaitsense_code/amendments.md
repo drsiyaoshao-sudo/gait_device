@@ -51,7 +51,7 @@ Expansion: Assumed confirmation is not confirmation. The agent states the criter
 
 If something cannot be tested in simulation, a simulation test must be written first. Hardware is a validation tool, not a debugging tool.
 
-Expansion: A hardware result that deviates from the simulation prediction is evidence of a hardware or mounting problem, not a firmware problem — unless the corresponding simulation test was never written. The handoff document (`docs/handoff.md`) is the binding prediction set against which hardware results are compared.
+Expansion: A hardware result that deviates from the simulation prediction is evidence of a hardware or mounting problem, not a firmware problem — unless the corresponding simulation test was never written. The handoff document (`docs/executive_branch_document/handoff.md`) is the binding prediction set against which hardware results are compared.
 
 ---
 
@@ -76,7 +76,7 @@ Expansion: Continuing past three failures compounds token debt and masks the roo
 ### Amendment 8 — Bug Triage and Documentation
 *Traces to: Article II*
 
-All bugs that require more than one fix attempt must be categorized and documented in `docs/bug_receipt.md` using the seven-category taxonomy before the session ends.
+All bugs that require more than one fix attempt must be categorized and documented in `docs/executive_branch_document/bug_receipt.md` using the seven-category taxonomy before the session ends.
 
 The seven categories: walker profile bug, gait algorithm bug, firmware generation bug, Python simulation bug, bare-metal C simulation bug, dependencies bug, hardware porting bug.
 
@@ -105,7 +105,7 @@ Expansion: BOM changes have supply chain, procurement, and schedule consequences
 ### Amendment 11 — Signal Plot Mandate
 *Traces to: Article I + II*
 
-After any change to `walker_model.py` or any filter coefficient in `phase_segmenter.c` or `step_detector.c`, an agent must generate a signal plot, save it to `docs/plots/`, and wait for human visual confirmation before proceeding.
+After any change to `walker_model.py` or any filter coefficient in `phase_segmenter.c` or `step_detector.c`, an agent must generate a signal plot, save it to `docs/executive_branch_document/plots/`, and wait for human visual confirmation before proceeding.
 
 Expansion: Signal plots are the primary mechanism for catching silent model errors that pass numerical tests. Human visual review of biomechanical plausibility cannot be substituted by a numerical test. An SI value that looks correct can be produced by a physically implausible signal.
 

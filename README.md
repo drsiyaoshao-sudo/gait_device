@@ -318,7 +318,7 @@ gait_device/
 
 ## 7. Known Bugs and Resolutions
 
-All bugs discovered during simulation are resolved before hardware handoff. The table below is the complete record. See [docs/bug_receipt.md](docs/bug_receipt.md) for full symptom → root cause → fix detail on each.
+All bugs discovered during simulation are resolved before hardware handoff. The table below is the complete record. See [docs/executive_branch_document/bug_receipt.md](docs/executive_branch_document/bug_receipt.md) for full symptom → root cause → fix detail on each.
 
 ### Summary
 
@@ -427,5 +427,5 @@ BUG-013 is the proof: a silently-zeroed SI computation that would have shipped a
 
 ## 9. BOMs
 
-- [Hardware BOM](docs/hw_bom.md) — ~$45–50, Seeed XIAO nRF52840 Sense + perfboard assembly
-- [Software BOM](docs/sw_bom.md) — full open-source stack; SEGGER tools free for non-commercial use
+- [Hardware BOM](docs/executive_branch_document/hw_bom.md) — ~$45–50, Seeed XIAO nRF52840 Sense + perfboard assembly
+- [Software BOM](docs/executive_branch_document/sw_bom.md) — full open-source stack; SEGGER tools free for non-commercial use

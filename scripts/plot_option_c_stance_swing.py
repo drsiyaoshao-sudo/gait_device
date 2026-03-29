@@ -8,7 +8,7 @@ Shows for all 4 walker profiles:
            (push-off only: +295ms error  →  Option C: -50 to -100ms)
   Panel 4: Per-step stance_duration scatter (stairs closeup)
 
-Saved to docs/plots/option_c_stance_swing_accuracy.png
+Saved to docs/executive_branch_document/plots/option_c_stance_swing_accuracy.png
 """
 
 import sys, math
@@ -205,7 +205,7 @@ ax4.legend(fontsize=8); ax4.grid(True, alpha=0.3)
 ax4.set_ylim(0, GT["stairs"]["period"] * 1.1)
 
 plt.tight_layout()
-out = "docs/plots/option_c_stance_swing_accuracy.png"
+out = "docs/executive_branch_document/plots/option_c_stance_swing_accuracy.png"
 plt.savefig(out, dpi=150)
 print(f"Saved → {out}")
 print()

@@ -42,7 +42,7 @@ Empirical evidence — signal plots, UART output tables, unit test results — i
 
 ## The Amendments
 
-All amendments are maintained in [`docs/amendments.md`](docs/amendments.md). Amendments 1–14 are currently ratified. New amendments are added to that file through the Amendment Ratification Process below.
+All amendments are maintained in [`docs/gaitsense_code/amendments.md`](docs/gaitsense_code/amendments.md). Amendments 1–14 are currently ratified. New amendments are added to that file through the Amendment Ratification Process below.
 
 ---
 
@@ -65,7 +65,7 @@ The Bureaucracy has jurisdiction over any operation that:
 | **Package Management** | Install, update, or pin Python/C library dependencies | `pip install numpy scipy`, `pio lib install`, version pinning |
 | **Simulation Execution** | Run established simulation scripts against existing profiles | `pytest simulator/tests/`, `python scripts/test_flat_only.py`, Renode bridge on existing profiles |
 | **Instrument API Calls** | Interface with test and measurement hardware via established APIs | PPK2 current measurement, oscilloscope SCPI commands, logic analyzer capture, J-Link RTT log |
-| **Signal Plotting** | Generate and save signal plots per Amendment 11 | Execute the standard 3-panel plot template from Appendix C; save to `docs/plots/` |
+| **Signal Plotting** | Generate and save signal plots per Amendment 11 | Execute the standard 3-panel plot template from Appendix C; save to `docs/executive_branch_document/plots/` |
 | **Data Export** | Export session data to established formats | BLE snapshot CSV export, UART log capture, binary snapshot decode |
 | **Version Control Housekeeping** | Commit, push, branch management for completed validated work | `git add`, `git commit`, `git push`, branch sync |
 
@@ -246,43 +246,43 @@ A ruling is binding on all future agents and humans working on this codebase unt
 
 ## Case Law
 
-All rulings are maintained in [`docs/case_law.md`](docs/case_law.md). Five precedents are currently recorded. New rulings are appended to that file by the prevailing attorney immediately after each hearing, before any implementation begins.
+All rulings are maintained in [`docs/gaitsense_code/case_law.md`](docs/gaitsense_code/case_law.md). Five precedents are currently recorded. New rulings are appended to that file by the prevailing attorney immediately after each hearing, before any implementation begins.
 
 ---
 
 ## Appendix A — Stage Definitions and Exit Criteria
 
-*Migrated from the operational project record on the main branch. See `main:CLAUDE.md` Appendix A or the full stage definitions including all exit criteria with confirmation records dated 2026-03-27 and 2026-03-28.*
+*Operational content lives in [`docs/executive_branch_document/`](docs/executive_branch_document/). See the full stage definitions including all exit criteria with confirmation records dated 2026-03-27 and 2026-03-28 in that folder, or `main:CLAUDE.md` Appendix A.*
 
 ---
 
 ## Appendix B — Simulation Infrastructure Reference
 
-*Migrated from the operational project record on the main branch. See `main:CLAUDE.md` Appendix B or the seven-layer pipeline, boundary table, Renode test template, and invariant infrastructure documentation.*
+*Operational content lives in [`docs/executive_branch_document/`](docs/executive_branch_document/). See the seven-layer pipeline, boundary table, Renode test template, and invariant infrastructure documentation there, or `main:CLAUDE.md` Appendix B.*
 
 ---
 
 ## Appendix C — Signal Plot Template and Review Log
 
-*Migrated from the operational project record on the main branch. See `main:CLAUDE.md` Appendix C or the standard three-panel signal check template and confirmed plot review entries (slope walker, stair walker).*
+*Operational content lives in [`docs/executive_branch_document/`](docs/executive_branch_document/). See the standard three-panel signal check template and confirmed plot review entries there. Signal plot images are in [`docs/executive_branch_document/plots/`](docs/executive_branch_document/plots/).*
 
 ---
 
 ## Appendix D — Agentic Co-Design Flow
 
-*Migrated from the operational project record on the main branch. See `main:CLAUDE.md` Appendix D or the full stage-by-stage agent/human responsibility table and decision gates.*
+*Operational content lives in [`docs/executive_branch_document/`](docs/executive_branch_document/). See the full stage-by-stage agent/human responsibility table and decision gates there, or `main:CLAUDE.md` Appendix D.*
 
 ---
 
 ## Appendix E — HW-SW Co-Design Equivalence Map
 
-*Migrated from the operational project record on the main branch. See `main:CLAUDE.md` Appendix E or the git/software development to hardware co-design equivalence table.*
+*Operational content lives in [`docs/executive_branch_document/`](docs/executive_branch_document/). See the git/software development to hardware co-design equivalence table there, or `main:CLAUDE.md` Appendix E.*
 
 ---
 
 ## Appendix F — Measurement Philosophy Reference
 
-*Migrated from the operational project record on the main branch. See `main:CLAUDE.md` Appendix F or the derivation chain, three-primitive enforcement rules, and calibration documentation requirements.*
+*Operational content lives in [`docs/executive_branch_document/`](docs/executive_branch_document/). See the derivation chain, three-primitive enforcement rules, and calibration documentation requirements there, or `main:CLAUDE.md` Appendix F.*
 
 ---
 
