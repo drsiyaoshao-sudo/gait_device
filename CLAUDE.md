@@ -1,665 +1,528 @@
-# CLAUDE.md — Gait Device Project
+# CLAUDE.md — GaitSense Constitutional Governance Document
 
-## Purpose of this project: a proof-of-concept for agentic CI/CD of hardware software codesign
+## Preamble
 
-**High level mission statement**
+This document governs all development, simulation, and deployment decisions for the GaitSense ankle wearable project. It binds human developers and AI agents equally. The two Articles below are unconditional and cannot be amended, suspended, or reasoned around — by any agent, at any stage, under any circumstance. All operational rules derive from them as Amendments. All conflicts between Amendments are resolved through the four-branch governance system defined herein. The Articles are the bedrock. Everything else is built on top of them.
 
-Eliminate the "Hardware-Software Death Spiral" by using a 7-Layer Digital Twin to pre-validate failure modes before physical fabrication
-
-```
-1. Physics-Native Simulation: We don't inject sensor readings, we inject first order measureable quantities to the simulator.
-
-2. Deterministic Auditing: Every algorithmic change is verified against the known failure modes.
-
-3. Instruction-Level Readiness: Current logic is validated in a bare-metal C environment, ensuring the math survives the transition from Python to MCU registers.
-
-4. The Recursive Loop: This document serves as the system's "State Observer"—capturing the 0-to-1 learning process for developer and engineers using this method.
-
-5. The Big Milestone of Proof-of-Concept:
-   - Capture known failure modes of the "Stair Walker" profile on both the Python and bare-metal C simulators.
-   - Guided Claude Code search for the algorithmic and hardware fix.
-   - Simulation of the fix on both platforms to verify the "Ghost" is caught.
-   - Handoff of project hardware, firmware, software, and their BOMs to a third party for physical device validation to understand "the good," "the bad," and "the ugly" of this approach.
-```
-## Development Philosophy
-
-**The development order is fixed and must never change:**
-
-```
-1. Firmware  →  2. Software  →  3. Simulation  →  4. Edge Cases  →  5. Hardware Deployment
-```
-
-Every step must be confirmed correct before advancing to the next. The purpose is to collapse the development cycle: catch algorithmic failures before firmware, catch bugs in firmware logic before simulation, catch simulation failures before touching hardware, and catch edge cases before deployment. Hardware is expensive to debug — everything before it is not.
+The four branches of governance are: the **Legislature** (proposes changes as Bills), the **Judiciary** (resolves conflicts and approves Bills), the **Amendment Ratification Process** (adds new rules to the Constitution), and the **Bureaucracy** (executes routine technical operations under standing orders without requiring approval). These four branches, together with the two Articles, constitute the complete governance system for this project.
 
 ---
 
-## Measurement Philosophy — Three Walking Pattern Primitives
+## Article I — Physics First
 
-**Never reason directly from raw IMU axes.**
+No signal, threshold, gate, or algorithmic parameter may be defined, proposed, or accepted unless it traces to a first-order physically measurable quantity.
 
-All analysis — algorithm design, simulator signal generation, terrain reasoning, and edge case discussion — must start from three first-order walking pattern measurements:
+The three and only three first-order primitives of walking gait are:
 
 ```
-1. Vertical Oscillation (cm)   — amplitude of CoM vertical movement per step
+1. Vertical Oscillation (cm)   — amplitude of centre-of-mass vertical movement per step
 2. Cadence (steps/min)         — fundamental temporal frequency of gait
 3. Step Length (m)             — spatial extent of each step
 ```
 
-All signal shape parameters (`hs_impact_g`, `peak_angvel_dps`, `stance_frac`) are **derived** from these three, not set independently. Raw IMU values are sensor-frame projections of these underlying quantities.
+All IMU axis values are projections of these three quantities onto a sensor frame. They are measurements of the primitives, not primitives themselves.
 
-### Derivation Chain
+**This Article is unconditional.** A parameter that cannot be traced to a physical quantity is not a parameter — it is a guess. Guesses are not permitted in this codebase.
+
+---
+
+## Article II — Learner-in-the-Loop
+
+No decision that changes the physical or algorithmic direction of the project may be made by an agent alone.
+
+**An agent executes. A human decides.**
+
+The boundary is defined as: any action whose consequence cannot be fully reversed by a single `git revert` requires human approval before execution. The physical act of flashing firmware to hardware is the limiting case — it is irreversible within a session.
+
+Empirical evidence — signal plots, UART output tables, unit test results — is the only valid input to a human decision. Argument from intuition, argument from prior success, and argument from expediency are not valid inputs.
+
+**This Article is unconditional.** An agent that self-selects the direction of an algorithm fix without a human choice confirmation has violated this Article, regardless of whether the fix turns out to be correct.
+
+---
+
+## The Amendments
+
+### Amendment 1 — Five-Stage Development Order
+*Traces to: Article I + II*
+
+Development proceeds in exactly this order — Firmware, Software, Simulation, Edge Cases, Hardware Deployment — and no stage begins until the previous stage's exit criteria are explicitly confirmed by the human.
+
+Expansion: This order exists because each stage's errors become exponentially more expensive to fix in later stages. An agent must not begin Stage N+1 work while Stage N has any open failure, even one that appears unrelated to the next stage's work. Hardware cannot be used as a debugging tool.
+
+*Technical reference: Appendix A — Stage Definitions and Exit Criteria*
+
+---
+
+### Amendment 2 — Three Measurement Primitives
+*Traces to: Article I*
+
+Walker profiles must specify `vertical_oscillation_cm`, `cadence_spm`, and `step_length_m` as primary fields. All other signal parameters are derived from these. No other parameters may be set directly.
+
+Expansion: The derivation chain is mandatory, not optional. A walker profile that specifies `hs_impact_g` directly without deriving it from vertical oscillation and cadence violates Article I regardless of whether the resulting signal looks plausible.
+
+*Technical reference: Appendix F — Measurement Philosophy Reference*
+
+---
+
+### Amendment 3 — Seven-Layer Simulation Pipeline Integrity
+*Traces to: Article I*
+
+The seven simulation layers are never collapsed. Each layer owns exactly one transformation and must not touch the transformation owned by any other layer.
+
+Expansion: Layer ownership is defined in Appendix B. The boundary table is normative. An agent that passes biomechanical quantities into the IMU model layer, or performs algorithm-level computation in the display layer, has violated this amendment regardless of whether the output is numerically correct.
+
+*Technical reference: Appendix B — Simulation Infrastructure Reference*
+
+---
+
+### Amendment 4 — Stage Gate Confirmation
+*Traces to: Article II*
+
+Before advancing from any stage to the next, an agent must state each exit criterion, confirm explicitly whether it is met, and record the human's confirmation verbatim. Advancement without this record is not permitted.
+
+Expansion: Assumed confirmation is not confirmation. The agent states the criteria. The human confirms. The agent records the confirmation. This protects against the most common failure mode in hardware development: a stage that passes without anyone verifying what was actually tested.
+
+---
+
+### Amendment 5 — Simulation is the Hardware Proxy
+*Traces to: Article I + II*
+
+If something cannot be tested in simulation, a simulation test must be written first. Hardware is a validation tool, not a debugging tool.
+
+Expansion: A hardware result that deviates from the simulation prediction is evidence of a hardware or mounting problem, not a firmware problem — unless the corresponding simulation test was never written. The handoff document (`docs/handoff.md`) is the binding prediction set against which hardware results are compared.
+
+---
+
+### Amendment 6 — Hardware Deployment Irreversibility
+*Traces to: Article II*
+
+No agent may initiate or recommend a firmware flash without explicit human approval in the same conversation turn that the flash is requested.
+
+Expansion: "Flash" means any action that writes firmware to physical hardware. The agent provides the flash command and bring-up checklist. The human executes. The agent's role ends at handing the human the verified command.
+
+---
+
+### Amendment 7 — Three-Strike Escalation Rule
+*Traces to: Article II*
+
+If a simulation, unit test, or iterative fix process fails to meet exit criteria within three attempts, the agent must stop, report the full status to the human, and wait for a human determination before any further action.
+
+Expansion: Continuing past three failures compounds token debt and masks the root cause. The three-strike report must include: what was attempted, what was observed on each attempt, and what the agent does not know. The agent must not propose a fourth approach without human direction.
+
+---
+
+### Amendment 8 — Bug Triage and Documentation
+*Traces to: Article II*
+
+All bugs that require more than one fix attempt must be categorized and documented in `docs/bug_receipt.md` using the seven-category taxonomy before the session ends.
+
+The seven categories: walker profile bug, gait algorithm bug, firmware generation bug, Python simulation bug, bare-metal C simulation bug, dependencies bug, hardware porting bug.
+
+Expansion: A bug that is fixed but not categorized is a traceability gap. Future agents and engineers cannot distinguish it from a known risk without this record.
+
+---
+
+### Amendment 9 — Algorithm Search Honesty
+*Traces to: Article I + II*
+
+When an algorithm fix domain has been exhausted without resolution, the agent must explicitly state which domain was searched, why it yielded no result, and offer no more than three alternative domains. The human selects exactly one. The hardware iteration option must always remain on the list.
+
+Expansion: An agent that continues searching within an exhausted domain without disclosure violates Article II. Switching domains unilaterally violates the same Article. The hardware iteration option is never automatically eliminated — the cost of the algorithm fix may exceed the cost of a sensor repositioning or BOM change.
+
+---
+
+### Amendment 10 — BOM Optimization Transparency
+*Traces to: Article II*
+
+When an agent identifies that an algorithm change enables lower-cost hardware, it must explicitly state this and the physical reasoning before proceeding. The human decides whether to optimize. Accepted BOM changes must be recorded in CLAUDE.md.
+
+Expansion: BOM changes have supply chain, procurement, and schedule consequences an agent does not possess. BOM changes or hardware specification changes require explicit human authorization.
+
+---
+
+### Amendment 11 — Signal Plot Mandate
+*Traces to: Article I + II*
+
+After any change to `walker_model.py` or any filter coefficient in `phase_segmenter.c` or `step_detector.c`, an agent must generate a signal plot, save it to `docs/plots/`, and wait for human visual confirmation before proceeding.
+
+Expansion: Signal plots are the primary mechanism for catching silent model errors that pass numerical tests. Human visual review of biomechanical plausibility cannot be substituted by a numerical test. An SI value that looks correct can be produced by a physically implausible signal.
+
+*Technical reference: Appendix C — Signal Plot Template and Review Log*
+
+---
+
+### Amendment 12 — Renode Test Template Invariance
+*Traces to: Article I*
+
+When creating a new Renode simulation test, copy `scripts/renode_test_template.py` and replace only Sections 2 (signal generation) and 5 (assertions). Sections 1, 3, and 4 must not be modified.
+
+Expansion: Sections 1, 3, and 4 are the invariant infrastructure — MCU platform, bridge execution, and UART result parsing. Modifying these per-test introduces infrastructure drift. A test that passes because of a customized infrastructure section has not validated the firmware.
+
+*Technical reference: Appendix B — Simulation Infrastructure Reference*
+
+---
+
+### Amendment 13 — Calibration Discipline
+*Traces to: Article I*
+
+One new calibration constant may be introduced per algorithmic iteration. Every calibration constant must be documented with its physical derivation in CLAUDE.md before the session ends.
+
+Expansion: Calibration constants that cannot be traced to a physical measurement are tuning knobs, not calibrations. A physically derived constant predicts its own hardware value. A tuned constant requires re-tuning at every hardware configuration change.
+
+---
+
+### Amendment 14 — Interim Results and Decision Logging
+*Traces to: Article II*
+
+During any iterative build-debug process, intermediate results must be printed to the console for human review. The agent waits for a human determination before proposing the next action. The specific human decision must be recorded verbatim in CLAUDE.md.
+
+Expansion: This rule prevents the most common failure mode in agentic development: an agent that runs five sub-steps autonomously, encounters an anomaly in step 2, compensates in step 3, and delivers a result in step 5 that looks correct but carries a hidden assumption no human ever approved. The CLAUDE.md record of human decisions is the audit trail.
+
+---
+
+## The Bureaucracy
+
+The Bureaucracy is the semi-executive branch of career civil servants. It executes established technical procedures autonomously — without a Bill, a Judicial Hearing, or an Amendment vote. These are the operations that must happen reliably every time, the same way every time, regardless of the political or algorithmic debate happening in other branches.
+
+### Section 1 — What the Bureaucracy Governs
+
+The Bureaucracy has jurisdiction over any operation that:
+- Executes an established procedure with a known-good outcome
+- Does not alter the behaviour of firmware, simulation, or algorithm
+- Is repeatable, deterministic, and fully reversible (or produces only additive output)
+
+### Section 2 — Standing Orders (pre-approved operation classes)
+
+| Class | Operations | Examples |
+|-------|-----------|---------|
+| **Firmware Build** | Compile and link firmware ELF from existing source | `pio run -e xiaoble_sense_sim`, two-step ninja build, ELF size verification |
+| **Package Management** | Install, update, or pin Python/C library dependencies | `pip install numpy scipy`, `pio lib install`, version pinning |
+| **Simulation Execution** | Run established simulation scripts against existing profiles | `pytest simulator/tests/`, `python scripts/test_flat_only.py`, Renode bridge on existing profiles |
+| **Instrument API Calls** | Interface with test and measurement hardware via established APIs | PPK2 current measurement, oscilloscope SCPI commands, logic analyzer capture, J-Link RTT log |
+| **Signal Plotting** | Generate and save signal plots per Amendment 11 | Execute the standard 3-panel plot template from Appendix C; save to `docs/plots/` |
+| **Data Export** | Export session data to established formats | BLE snapshot CSV export, UART log capture, binary snapshot decode |
+| **Version Control Housekeeping** | Commit, push, branch management for completed validated work | `git add`, `git commit`, `git push`, branch sync |
+
+### Section 3 — Escalation Triggers
+
+A bureaucratic operation that hits any of the following conditions must stop and escalate immediately:
+
+| Trigger | Escalates to |
+|---------|-------------|
+| Output deviates from the predicted result | Legislature — new Bill required |
+| Two Standing Orders produce conflicting results | Judiciary — Hearing required |
+| A new instrument or API class is needed with no Standing Order | Legislature — Bill to establish new Standing Order class |
+| Any operation that would change source code, algorithm logic, or hardware specification | Legislature — out of scope for Bureaucracy |
+| Three consecutive failures of the same Standing Order | Amendment 7 — escalate to human |
+
+### Section 4 — Career Civil Servant Conduct Rules
+
+1. A civil servant executes the established procedure exactly. It does not improve, optimize, or adapt it based on context. Adaptation is legislation.
+2. A civil servant records its output. Every bureaucratic operation produces a log entry: what was run, what was observed, timestamp.
+3. A civil servant is not an attorney. If asked to argue for or against a Bill or ruling, it declines and refers to the Judiciary.
+4. A civil servant is not a legislator. If it observes a problem requiring a new rule, it files an escalation report — it does not draft the Bill.
+5. A civil servant operates at any stage of development. The five-stage gate (Amendment 1) applies to the Legislature and Judiciary; bureaucratic operations can run at any time within their pre-approved scope.
+
+---
+
+## The Amendment Ratification Process
+
+This process governs how new rules are added to the Constitution itself. The Articles can never be amended. Only the numbered Amendments can be added to or changed through this process.
+
+### Section 1 — What Qualifies as a Proposed Amendment
+
+A proposed amendment is a new governance rule that would apply to all future decisions — not a specific technical change (that is a Bill) and not a conflict ruling (that is a Judicial Hearing). Technical precedents set by Bills become Case Law, not Amendments.
+
+### Section 2 — Proposal Format
 
 ```
-vertical_oscillation + cadence  →  heel strike impact magnitude, acc_z modulation depth
-step_length + cadence           →  walking speed → push-off angular velocity (gyr_y peak)
-terrain_slope_deg               →  DC gravity offset on acc_x/acc_z (not oscillation)
-terrain_type                    →  signal morphology (sinusoidal / non-sinusoidal)
+### PROPOSED AMENDMENT [N]: [Title]
+Proposed by: [agent or human]
+Date: [date]
+Traces to: Article I / Article II / both
+
+Governing rule (one sentence):
+[The rule — must be stated in one sentence, as all existing amendments are]
+
+Physical or process justification:
+[Why this rule is needed. Cite a failure mode, gap, or empirical observation.]
+
+Amendment it complements or constrains:
+[Which existing amendment(s) does this interact with?]
+
+What happens without it:
+[The specific failure mode or ambiguity that persists if not ratified.]
 ```
 
-### Enforcement
+### Section 3 — Ratification Vote
 
-- Simulator walker profiles must specify `vertical_oscillation_cm`, `cadence_spm`, `step_length_m` as primary fields. All other signal parameters derive from them.
-- Any threshold magic number must be traceable to a first-order physical quantity, not a raw axis reading.
-- All calibration procedures must be documented in Claude.md dedicated section and limited to be one calibration per algorithmic iteration.
-- During iterative building and debugging, intermediate results must be printed to the console for human review. Claude must wait for a human determination of the next step before proposing action items. The specific human prompt/decision must be explicitly recorded in CLAUDE.md.
+A proposed amendment is opened for vote after debate. Each voter casts: **Ratify**, **Reject**, or **Return for revision** (with written conditions). Agents argue both for and against using the Judicial hearing procedure before the vote is cast.
+
+### Section 4 — Supermajority Threshold and Quorum
+
+- **Current state (single human):** The one human constitutes the full voting body. Explicit ratification required — silence is not ratification.
+- **Future state (multi-team):** Ratification requires **> 60% of teams** to vote Ratify. Each team has one vote regardless of team size. Quorum requires at least 2 teams. An amendment that passes with < 60% is rejected; it may be revised and re-proposed after addressing dissenting objections.
+- **Articles are immune:** No vote can amend Article I or Article II. Any proposed amendment that contradicts an Article is invalid and cannot be brought to a vote.
+
+### Section 5 — Recording a Ratified Amendment
+
+A ratified amendment is added to the numbered Amendments list immediately, with its full proposal text, vote record, and date. It takes effect from the moment it is recorded. All agents are bound by it from that point forward.
+
 ---
 
-## Simulation Pipeline — Tech Stack
+## The Legislative Process
 
-The simulation pipeline has seven layers with clean boundaries. **Never collapse layers** — each owns exactly one transformation.
+### Section 1 — What Requires a Bill
+
+Any proposed change to simulation (new walker profile, signal parameter), firmware (algorithm patch, threshold, FSM state), software (new pipeline stage, parser change), or hardware (BOM change, sensor repositioning). Bug fixes that restore a known-correct state do not require a Bill. Changes that introduce new behaviour do.
+
+### Section 2 — Bill Format
 
 ```
-Walker Profile
-    │
-    ▼  1. simulator/walker_model.py       Python + NumPy
-       Input:  WalkerProfile dataclass
-       Output: np.ndarray (N,6) float32 — [ax ay az gx gy gz] in m/s² and dps
-               Biomechanics derived from three primitives: vert_osc, cadence, step_length
-    │
-    ▼  2. simulator/imu_model.py          Python + NumPy + struct
-       Input:  (N,6) float32 in physical units
-       Output: (N,12) bytes — LSM6DS3TR-C FIFO word format
-               Quantize → 16-bit int at sensor sensitivity
-                 accel ±16g  : 0.488 mg/LSB
-                 gyro  ±2000 : 70 mdps/LSB
-               Clip at ±32767 (saturation), pack big-endian register pairs
-    │
-    ▼  3. renode/lsm6ds3_stub.py          Renode Python peripheral API
-       Input:  FeedSample(ax,ay,az,gx,gy,gz) monitor commands
-       Output: I2C register responses (WHO_AM_I, FIFO_DATA_OUT_*) + INT1 GPIO assert
-               Maintains 32-sample watermark FIFO queue internally
-    │
-    ▼  4. Renode 1.16.1                   nRF52840 Cortex-M4F full-system simulation
-       Loads: firmware.elf (built by PlatformIO / west)
-       Runs:  imu_reader.c → calibration.c → gait_engine.c
-              (real C firmware, not mocked)
-    │
-    ▼  5. UART capture                    Renode telnet socket → signal_analysis.py
-       Firmware emits structured log lines:
-         "STEP #N ts=T acc=A gyr_y=G cadence=C spm"
-         "SNAPSHOT step=N si_stance=X% si_swing=Y% cadence=Z spm"
-         "SESSION_END steps=N"
-       signal_analysis.py parses → typed Python event objects
-    │
-    ▼  6. BLE simulation bypass           CONFIG_GAIT_UART_EXPORT=y build flag
-       BLE radio not simulated. Firmware variant dumps binary rolling_snapshot_t
-       structs over UART instead of GATT notifications.
-       Python unpacks: struct.unpack("<IIHHHHBb")   (20 bytes per snapshot)
-       ── Real hardware path (future): bleak 2.1.1 async BLE central ──
-       IMPORTANT: CONFIG_GAIT_UART_EXPORT firmware change is documented in README.md
-    │
-    ▼  7. simulator/app.py                Streamlit 1.55 + Plotly 6.6
-       Four panels: raw IMU signal + step markers │ SI time series (all walkers)
-                    phase timing bar              │ derived parameter table
+### BILL: [Descriptive name]
+Proposed by: [agent or human]
+Date drafted: [date]
+Change type: simulation / firmware / software / hardware
+
+Problem statement:
+[What failure mode, gap, or improvement does this address?
+Cite the specific test result, signal measurement, or clinical observation.]
+
+Proposed change:
+[Exactly what changes — file names, function names, parameter values]
+
+Article/Amendment grounding:
+[Which Article or Amendment authorizes this change?
+Which amendment would it violate if not made?]
+
+Physical evidence:
+[Signal plots, UART output, unit test results, or measurements that support the proposal.
+A Bill with no physical evidence is returned to the drafter — it cannot be debated.]
+
+Expected outcome:
+[What clinical or hardware improvement does this produce, stated in measurable terms.
+e.g., "stairs step detection increases from 0/100 to ≥98/100"]
+
+Branch:
+[The git branch on which this change will be implemented if enacted]
 ```
 
-### Layer Boundary Rules
+### Section 3 — Legislative Debate
 
-| Layer | Owns | Must NOT touch |
-|---|---|---|
-| walker_model | Biomechanics, timing | Sensor units, byte format |
-| imu_model | Quantization, packing | Biomechanics, algorithm |
-| lsm6ds3_stub | I2C protocol, FIFO, INT1 | Signal content |
-| Renode + firmware.elf | Algorithm execution | Signal generation |
-| signal_analysis | Parsing, typed events | Display |
-| BLE / UART dump | Transport format | Content |
-| app.py | Display only | Any computation |
+A Bill is debated before any implementation. An agent is assigned as the opposing attorney. The debate follows the seven-step Judicial hearing procedure. The Justice (human) presides. The Bill is either enacted, rejected, or returned for revision with specified conditions.
+
+### Section 4 — Enactment and Branch Strategy
+
+An enacted Bill is implemented on a dedicated branch named for the Bill. Implementation is validated against the expected outcome stated in the Bill. Only when validation passes does the branch merge to main. The enacted Bill is archived as a new Case Law entry.
 
 ---
 
-## Renode Test Script Template
+## The Judicial Process
 
-All Stage 3 Renode simulation tests use a single template to ensure the MCU setup, UART capture, and result parsing infrastructure never diverges between tests. Only the signal generation section changes.
+### Section 1 — Jurisdiction
 
-### Template location
-`scripts/renode_test_template.py` — copy and rename for each new test.
+The Judicial Process activates when:
+- Two or more amendments appear to mandate incompatible actions; or
+- A situation arises that no amendment directly addresses; or
+- An agent is uncertain which amendment governs a decision
 
-### Module structure (what changes vs. what is invariant)
+In all other cases, the agent applies the relevant amendment directly.
 
+### Section 2 — Role Definitions
+
+- **The Justice:** The human. Makes rulings. Never argues a position — only evaluates evidence and announces a ruling.
+- **The Attorneys:** AI agents. Argue positions assigned by the Justice. An attorney's job is to make the strongest possible case for its assigned position, citing amendment text, precedent, and physical grounding. An attorney does not volunteer a verdict.
+- **The Record:** All hearings and rulings are recorded in the Case Law section of this document before any implementation begins.
+
+### Section 3 — The Benjamin Franklin Principle
+
+*Governing the method of evidence:*
+
+The Justice's ruling must be based on empirical evidence — a signal plot, a test result, a measurement, a physical constraint, a budget figure — or on the governing Articles. A ruling that cannot cite its physical or empirical basis is not a valid ruling.
+
+### Section 3a — The Thomas Jefferson Principle
+
+*Governing the purpose of every ruling:*
+
+The ultimate goal of every decision in this system — every hearing, every ruling, every amendment applied — is to maximize the probability of the best possible hardware outcome: a device that is correct, robust, and honest in its clinical output.
+
+No ruling that is procedurally correct but leads away from this outcome is a valid ruling. Where amendments and precedents are silent or ambiguous, the Justice asks one question: *which decision gives a patient the most accurate measurement of their own gait?* That answer governs.
+
+### Section 4 — Hearing Procedure
+
+1. **Declaration.** The Justice identifies the conflict: "I am declaring a hearing on [descriptive name]. The competing positions are: Position A (invoke Amendment N) and Position B (invoke Amendment M)."
+
+2. **Assignment.** The Justice assigns an agent to each position. If only one agent is available, it argues Position A in full before arguing Position B.
+
+3. **Argument — Position A.** The assigned attorney presents:
+   - Which amendment is invoked (cite exact amendment number and title)
+   - Which precedent supports this position (cite case name and date)
+   - What physical or clinical outcome this position protects
+   - What the consequences of the opposing position would be in physical terms
+
+4. **Argument — Position B.** The opposing attorney presents the same four elements for the opposing position.
+
+5. **Deliberation.** The Justice may ask each attorney one clarifying question. The attorney answers only the question asked.
+
+6. **Ruling.** The Justice announces:
+   - Which position prevails
+   - The governing physical/empirical basis (Benjamin Franklin Principle)
+   - The ultimate patient/hardware outcome protected (Thomas Jefferson Principle)
+   - Any conditions or constraints on how the ruling is applied
+
+7. **Recording.** The prevailing attorney records the ruling in the Case Law section using the standard template. The record is complete before any implementation work begins.
+
+### Section 5 — Binding Effect
+
+A ruling is binding on all future agents and humans working on this codebase until explicitly overruled by a new hearing. When an agent encounters a situation that matches an existing case, it must apply the precedent. If the agent believes the precedent should not apply, it must declare a hearing — it may not deviate from precedent unilaterally.
+
+---
+
+## Case Law
+
+*Format for each case:*
 ```
-scripts/renode_test_template.py
-├── Section 1 — MCU Platform         INVARIANT  nRF52840, sim_imu_stub, sim_uart_stub
-├── Section 2 — Signal Generation    REPLACE    generate_signal() → (N,6) float32
-├── Section 3 — Bridge Execution     INVARIANT  RenoneBridge.run(samples)
-├── Section 4 — UART Result Parsing  INVARIANT  signal_analysis typed events
-└── Section 5 — Assertions           REPLACE    check_results() pass/fail criteria
-```
-
-**Rule**: When adding a new walker profile, failure mode, or edge case test, copy the template and replace Sections 2 and 5 only. Sections 1, 3, 4 are identical across all tests and must not be modified per test.
-
-### Signal generation interface contract
-```python
-def generate_signal() -> np.ndarray:
-    # Must return: shape (N, 6), dtype float32
-    # Columns: [ax, ay, az, gx, gy, gz]
-    # Units: m/s² for accel, dps for gyro
-    # Rate: 208 Hz (ODR_HZ constant)
-    # Note: bridge prepends 450 stationary samples automatically
-```
-
-### Invariant infrastructure (Sections 1 + 3 + 4)
-
-| Component | File | Role |
-|---|---|---|
-| MCU platform | `nrf52840.repl` (Renode built-in) | Cortex-M4F, SRAM, Flash, NVIC, UARTE0, TWIM0 |
-| IMU stub | `renode/sim_imu_stub.py` | LSM6DS3TR-C I2C emulation @ 0x400B0000; file-based index |
-| UART stub | `renode/sim_uart_stub.py` | Replaces uart0 @ 0x40002000; TXSTOPPED fix (reads=1); DMA byte capture via `self.GetMachine().SystemBus.ReadByte()` |
-| Bridge | `simulator/renode_bridge.py` | Orchestrates two-REPL setup, ELF load, RunFor, sentinel polling |
-| Parser | `simulator/signal_analysis.py` | Parses STEP/SNAPSHOT/SESSION_END typed events |
-
-### Existing tests using the template pattern
-| Script | Section 2 (signal) | Section 5 (assertion) |
-|---|---|---|
-| `scripts/test_sine_wave.py` | 1.5 Hz sine on az, 10s | SESSION_END received, 0 steps |
-| `scripts/test_renode_smoke.py` | Walker 1 flat, 100 steps | steps±5, SI±3% |
-
----
-
-## Stage Definitions and Exit Criteria
-
-### Stage 1 — Firmware
-Write and validate the embedded firmware (Zephyr RTOS, C).
-
-**Work done here:**
-- IMU driver (`imu_reader.c`): FIFO watermark trigger, batch read, `imu_sample_queue` enqueue
-- Calibration (`calibration.c`): static bias removal, NVS persistence
-- Gait algorithm (`step_detector.c`, `phase_segmenter.c`, `foot_angle.c`, `rolling_window.c`)
-- Session lifecycle (`session_mgr.c`): button debounce, LED state machine
-- BLE export (`ble_gait_svc.c`): GATT service, snapshot notifications, MTU negotiation
-- Snapshot buffer (`snapshot_buffer.c`): RAM backend, optional W25Q16 flash fallback
-
-**Exit criteria — ALL must pass before moving to Stage 2:**
-- [x] Firmware compiles cleanly — **CONFIRMED 2026-03-27**: ELF built via ninja two-step (BUG-005). Flash=37.7KB/1MB (3.6%), SRAM=118KB/256KB (45.2%). ELF runs correctly in Renode bare-metal for all 4 walker profiles. Note: `pio run -e xiaoble_sense` (hardware target) not separately verified; sim target `xiaoble_sense_sim` confirmed.
-- [ ] All Zephyr ztest unit tests pass: `west build -b native_posix tests/gait_unit && ./build/zephyr/zephyr.exe` — **NOT RUN**: no `tests/gait_unit` directory exists; Zephyr west toolchain not configured on this machine
-- [x] All PlatformIO native unit tests pass — **CONFIRMED 2026-03-27**: `gcc -DUNIT_TEST` build of `test/native/` (note: `pio test -e native` does not discover these tests because they use plain `assert()` not Unity; compiled and run directly). All 3 suites pass: `test_step_detector` (3 tests), `test_rolling_window` (5 tests), `test_foot_angle` (3 tests). Fixed stub: added `#define printk printf` to `test/native/stubs/logging/log.h`.
-- [x] Step detector: ≥ 98/100 steps on synthetic CSV fixture — **CONFIRMED 2026-03-27**: `test_synthetic_walk` → 100/100 detected; also confirmed in Renode bare-metal (all 4 profiles 100/100)
-- [x] Symmetry Index: SI = 0 for identical steps, SI ≈ 13.3% for alternating 350ms/400ms stance — **CONFIRMED 2026-03-27**: `test_si_identical_steps` → SI=0.00%; `test_si_alternating` → SI=13.30% (target 13.33%) — both PASS
-- [x] Foot angle drift: < 1° over 1 second of noisy zero-input — **CONFIRMED 2026-03-27**: `test_drift_1s_zero_input` → drift=0.0044° < 1° — PASS
-- [x] Phase segmenter: stance and swing durations within ±20ms of synthetic ground truth — **CONFIRMED 2026-03-28**: BUG-009 resolved (session 2) restored full gait cycle completion. BUG-013 (VABS.F32) resolution confirmed phase segmenter produces correct odd/even stance durations reaching the rolling window — pathological walker validation shows firmware correctly resolves ±45ms alternating stance offset (17–24% detected SI vs 25% true) across all 4 terrain profiles on virtual Cortex-M4F.
-
-**Do not proceed to Stage 2 if any unit test fails. Fix the firmware first.**
-
----
-
-### Stage 2 — Software
-Build the simulator engine and host tool (Python).
-
-**Work done here:**
-- Walker model (`simulator/walker_model.py`): `WalkerProfile` dataclass, `generate_imu_sequence()`
-- Signal analysis (`simulator/signal_analysis.py`): parse UART step events and snapshot structs
-- Host BLE tool (`host_tool/download_session.py`): connect, subscribe notifications, export CSV
-- Renode bridge (`simulator/renode_bridge.py`): launch Renode, feed FIFO stub, drain UART
-- Streamlit UI (`simulator/app.py`): profile selector, sliders, IMU signal chart, SI time-series chart
-
-**Exit criteria — ALL must pass before moving to Stage 3:**
-- [x] Python unit tests pass: `pytest simulator/tests/` — **CONFIRMED 2026-03-27** (151/151 pass). Fixed: `test_signal_analysis.py` fixture updated to integer×10 format matching firmware; `gait_algorithm.run()` updated to use `TerrainAwareStepDetector` so stairs pipeline detects 100/100 steps in Python path.
-- [x] `generate_imu_sequence()` produces correct shape `(N, 6)` at 208 Hz for all 4 built-in profiles — **CONFIRMED 2026-03-27**: flat (2567,6), bad_wear (2567,6), slope (2823,6), stairs (3698,6), all float32
-- [x] Signal analysis correctly parses all UART event types (STEP, SNAPSHOT, SESSION_END) — **CONFIRMED 2026-03-27**: all 8 parsing tests pass; regex handles integer×10 encoded acc/gyr_y fields from firmware
-- [ ] Host tool connects to a mock BLE server and unpacks all 48-byte `step_record_t` structs without error
-- [ ] Streamlit UI launches without error: `streamlit run simulator/app.py`
-
-**Do not proceed to Stage 3 if any Python test fails or the UI does not launch.**
-
----
-
-### Stage 3 — Simulation
-Run the actual firmware ELF inside Renode against synthetic walker inputs. Firmware and software must be independently validated before this stage begins.
-
-**Work done here:**
-- Renode platform file (`renode/gait_nrf52840.repl`): nRF52840 + LSM6DS3 I2C stub + GPIO INT1
-- Renode scenario (`renode/gait_device.resc`): load ELF, inject stationary calibration samples, run
-- IMU feeder (`renode/robot/imu_feeder.py`): generate walking sequences, inject via Renode Python API
-- Robot Framework suite (`renode/robot/gait_test.robot`): build → simulate → assert UART output
-- Digital Twin UI: end-to-end run with Renode bridge, plot detected SI vs ground truth SI
-- Estimate power consumption, RAM usage, MCU clock speed, the goal is not to make it work, it is to make it work within budget
-
-**Exit criteria — ALL must pass before moving to Stage 4:**
-- [ ] `pio run -t simulate` completes without Renode crash or assertion fault
-- [ ] Robot Framework suite passes: `robot renode/robot/gait_test.robot`
-- [x] 100-step synthetic walk: `total_steps` in UART output within ±5 of 100 for 3 non-failure mode walkers — **CONFIRMED 2026-03-27** via `test_all_profiles.py` (Renode, bare-metal): Flat 100/100, Bad wear 100/100, Slope 100/100
-- [x] SI detection: firmware-detected SI within ±3% of ground truth for all 3 non-failure mode walkers — **CONFIRMED 2026-03-27**: Flat SI=0.04%, Bad wear SI=0.04%, Slope SI=0.84% — all well within 3%
-- [x] Stair walker: **BUG-010 RESOLVED 2026-03-27** — Option C terrain-aware detector. Original firmware: 0/100 steps. Option C firmware: 100/100 steps, SI=0.41% in bare-metal Cortex-M4F simulation. See `docs/algorithm_hunting_stair_walker.md` for full hunting procedure and `src/gait/step_detector.c` for C implementation.
-- [x] Rolling window: snapshots written every 10 steps, 200-step window fills correctly at session start — **CONFIRMED 2026-03-27 (session 2)**. 9 clean snapshots per 100-step run (fires at steps 9,19,…,89; step 100 = SESSION_END boundary). BUG-008 RESOLVED (removed duplicate LOG_INF). BUG-009 RESOLVED (phase segmenter terrain gate + cadence injection + CNN prior seeding). All 4 profiles: SI_stance=0.0%, SI_swing=0.0%, cadence within ±3 spm of ground truth. Flash=37.4KB, SRAM=118KB.
-- [x] BLE export simulation: all snapshot structs transferred and unpacked without CRC or length error — **CONFIRMED 2026-03-27 (session 3)**. CONFIG_GAIT_UART_EXPORT=y: firmware emits BLE_BINARY_START/hex-lines/BLE_BINARY_END before SESSION_END. parse_binary_export_log() hex-decodes → parse_binary_snapshots() unpacks rolling_snapshot_t structs. Flat 100 steps: 9/9 snapshots, SI_stance ΔSI=0.00%, cadence Δ<1 spm vs text path. Bug found: rolling_snapshot_t comment said 20 bytes, actual struct is 18 bytes (4+4+2+2+2+2+1+1) — comment corrected in rolling_window.h and signal_analysis.py.
-- [x] Power model: simulated FIFO idle interval ≈ 154ms (32 samples / 208 Hz); verify via UART timestamps — **CONFIRMED 2026-03-27 (session 2)**. Architectural verification: 32 samples ÷ 208 Hz = 153.85ms per batch (deterministic). Zephyr sleep path: `imu_reader.c` calls `k_sem_take(&imu_data_sem, K_FOREVER)` — MCU blocks on FIFO watermark INT1, yields to idle between batches. Power model: duty cycle=0.65%, I_avg=12.1 µA (1.1mA×0.65% + 5µA×99.35%), runtime=344 days on 100mAh. UART timestamp residual WARN (mean=0.262ms) is expected integer-ms rounding, not a sleep failure.
-- [x] Power consumption, RAM usage, MCU clock speed are in the budget of the proposed device — **CONFIRMED 2026-03-27 (session 2)**. Flash=37.4KB/1MB (3.6%), SRAM=118KB/256KB (45.2%) from build output. Active power ≈1.1mA, sleep ≈5µA, I_avg=12.1µA — well within target ≤1.5mA active / ≤5µA sleep from Stage 5 criteria. MCU runs at default 64MHz Cortex-M4F; algorithm completes per-batch processing well within FIFO window.
-
-**Do not proceed to Stage 4 if Robot Framework suite fails or SI accuracy is outside tolerance.**
-
----
-
-### Stage 4 — Edge Cases (the edge cases are more related to hardware capacity and failure not walker profiles)
-Stress-test the system against boundary conditions, adversarial inputs, and failure modes. This stage happens entirely in simulation and unit tests — no hardware yet.
-
-**Work done here:**
-- Algorithm edge cases: zero-step session, single step, exactly 200-step window boundary, step at max cadence (240 spm)
-- Sensor edge cases: FIFO overflow (drain too slow), all-zero IMU output, saturation at ±16g / ±2000 dps
-- Session edge cases: button held through session start, BLE disconnect mid-export, power loss mid-snapshot-write
-- Mounting edge cases: 30° offset on all axes (mounting_offset_deg in walker model), device flipped upside-down
-- Asymmetry edge cases: SI = 0 (perfectly symmetric), SI = 50% (maximum pathological), alternating cadence changes
-- Memory edge cases: RAM snapshot buffer full (5500 snapshots), flash present vs absent at boot
-
-**Exit criteria — ALL must pass before moving to Stage 5:**
-- [ ] All edge case unit tests pass (extend `tests/` suite with explicit edge case files)
-- [ ] No assertion faults or hard faults in Renode under any edge case input
-- [ ] `flags.mounting_suspect` correctly set when mounting offset > 15° at mid-stance
-- [ ] Snapshot buffer wrap-around: oldest snapshot correctly overwritten, no data corruption
-- [ ] SI computation returns 0 for identical steps and does not divide-by-zero when `M_odd + M_even = 0`
-- [ ] BLE reconnection: export resumes from correct snapshot index after disconnect and reconnect
-- [ ] Session with 0 steps: `session_summary_t` zeroed, no GATT notifications sent
-
-**Do not proceed to Stage 5 (hardware) until every edge case is resolved in simulation.**
-
----
-
-### Stage 5 — Hardware Deployment
-Flash the validated firmware ELF to physical XIAO nRF52840 Sense hardware. This is the final stage. All logic must already be correct.
-
-**Work done here:**
-- Flash via USB-C: drag `.uf2` to XIAO mass storage bootloader, or `nrfjprog --program` via J-Link
-- Bench bring-up: verify WHO_AM_I (0x6A) over I2C via RTT log, verify FIFO watermark interval ≈ 154ms via RTT timestamps
-- Calibration verification: stand still for 2s, verify acc_z ≈ 9.81 m/s² and gyro bias < 10 mdps/axis via RTT
-- Step count validation: walk exactly 100 steps, verify `total_steps` ≥ 98 via BLE session summary
-- Symmetry validation: 10mm shoe lift test (expect SI 8–15%), deliberate slow-side walking (extend stance ~15%, expect SI detection), natural walking baseline (expect SI < 5%)
-- Power validation: Nordic PPK2 current probe — verify ≤ 5 μA deep sleep, ≈ 1.1 mA active session average
-- Mechanical validation: conformal coat applied, JST connector sealed with RTV, strain relief beads on all XIAO castellated pad edges, strap does not rotate under running vibration
-
-**Exit criteria — project complete:**
-- [ ] Step count ≥ 98/100 on-device
-- [ ] SI values match simulation predictions within ±3%
-- [ ] Deep sleep current ≤ 5 μA (PPK2 verified)
-- [ ] Active session current ≤ 1.5 mA (PPK2 verified)
-- [ ] BLE snapshot export completes without packet loss for a 1000-step session
-- [ ] Device survives 10-minute run on treadmill with no false button presses, no mounting shift flag, no firmware fault
-
----
-
-## Future Analysis — Non-Linear Gait Effects (Do Not Implement Yet)
-
-The current walker model and standard gait algorithm operate on linear assumptions: constant cadence, constant step length, consistent impact force, and a single CoM oscillation per step. Real gait violates all of these, and the standard single-ankle SI algorithm cannot capture the resulting effects. Document them here for future algorithm or walker model extensions.
-
-### 1. Impact Force Non-Linearity (Body Weight × Terrain Hardness)
-- Heel strike impact is not purely a function of vertical oscillation. It also depends on body mass, walking speed, and surface compliance (concrete vs. grass vs. rubber mat).
-- A heavier or faster walker produces a proportionally larger acc_z impulse — but the impulse duration also shortens (stiffer arrest). The LP-filtered signal shape changes non-linearly.
-- **What the standard algorithm misses:** the adaptive threshold seeds off past peak amplitudes. A sudden weight-shift (e.g., carrying a heavy bag on one side) changes impulse amplitude on alternating steps, which the threshold history misinterprets as asymmetry.
-- **Future work:** parameterize `body_mass_kg` and `surface_stiffness` in `WalkerProfile`; derive impact duration and peak from impulse-momentum theorem rather than a fixed Gaussian sigma.
-
-### 2. Intra-Session Speed Variation (Non-Constant Cadence)
-- The standard algorithm assumes stationary cadence. Cadence is used to select LP filter cutoff (walk vs. run threshold at 130 spm) and to interpret the rolling 200-step SI window.
-- Real walkers accelerate, decelerate, pause, turn, and navigate obstacles. These transitions create step-to-step interval variation that the rolling window smooths poorly — a gait transition (start/stop) injects a burst of asymmetric-looking timing that persists for the full 200-step window.
-- **What the standard algorithm misses:** speed ramps produce systematic odd/even timing differences for ~10-20 steps (the acceleration phase), which inflates SI even for a perfectly symmetric walker.
-- **Future work:** add a `speed_profile` to `WalkerProfile` (constant, ramp-up, ramp-down, stop-and-go); detect cadence change rate in the algorithm and apply a window reset on transitions above a threshold.
-
-### 3. Uneven Ground (Lateral and Medial Perturbations)
-- On uneven ground (cobblestones, grass, trail), each foot lands at a slightly different angle relative to the body. This introduces step-by-step variation in:
-  - `foot_angle_ic` (initial contact angle) — varies ±5° on uneven ground vs. ±1° on treadmill
-  - `stance_duration` — the foot sinks or slips, extending or shortening contact
-  - `acc_z` baseline — surface normal is not vertical, projecting partial gravity onto acc_x
-- The standard algorithm uses stance duration as the primary SI metric, which becomes noisy on uneven ground even for symmetric walkers.
-- **Future work:** add a `ground_unevenness_cm` primitive to `WalkerProfile`; generate per-step random perturbations in foot angle and stance duration proportional to unevenness; characterize SI noise floor as a function of surface type.
-
-### 4. Fatigue-Driven Asymmetry Onset (Time-Varying SI)
-- Clinical gait asymmetry often emerges gradually as muscles fatigue. The SI is not constant across a session — it starts near 0% and drifts upward over minutes.
-- The current 200-step rolling window captures a snapshot of the current SI level, but the window size (200 steps ≈ 2 min) may be too long to detect rapid fatigue onset or too short to average out normal variability.
-- **What the standard algorithm misses:** it reports a mean SI over the window, not the trend. A walker whose SI drifts from 2% to 12% over 10 minutes would show an average of ~7% — below threshold — even though the endpoint SI is pathological.
-- **Future work:** compute a first-order trend (slope of SI vs. step index) within the rolling window; flag sessions where SI is increasing faster than a threshold rate (e.g., >0.5%/min).
-
-### Design Constraint for Future Extensions
-All future effects must still be expressible as perturbations to the three primitives (vertical oscillation, cadence, step length) or as new first-order parameters derived from physically measurable quantities. Do not add raw IMU axis offsets directly — trace every new parameter to a biomechanical or physical source.
-
----
-
-## Enforcement Rules
-
-1. **Never skip a stage.** Even if Stage 1 looks "obviously correct," run the unit tests. The simulation exists precisely because "obviously correct" firmware fails in ways that are obvious only after 3 hours of hardware debugging.
-
-2. **Never start Stage N+1 work while Stage N has open failures.** Fix the failure first. Layering new work on top of a known bug compounds the bug.
-
-3. **All stage transitions require explicit confirmation.** Before moving from any stage to the next, state the exit criteria, confirm each is met, and record the confirmation. Do not assume — verify.
-
-4. **Simulation is the hardware proxy.** If something cannot be tested in simulation, write the edge case test first, make it pass in simulation, then validate on hardware. Hardware is not a debugging tool — it is a validation tool.
-
-5. **Token usage awareness** To prevent recursive token overflow, the agent must STOP any simulation, unit test, or iterative process that fails to meet exit criteria within three attempts, explicitly reporting the status to the human for a next-step determination to ensure economical token usage and traceability in semi-black-box scenarios.
-
-6. **Bug treatment** All the bugs from simulation, unit test and iterative process that fail to meet exit criteria within three attempts must be stored in memory.md bug session and categorized as walker profile bug, gait algorithm bug, firmware generation bug, python simulation bug, bare-metal c simulation bug, dependencies bug, and hardware porting bug. This allows tracebility, human debugging and Claude debugging to minimize iterative processes.
-
-7. **Hardware deployment is irreversible within a session.** Once flashed, the firmware is running on physical hardware connected to a LiPo battery. Do not flash unvalidated firmware. Do not flash mid-stage.
-
-8. **Algorithm patches must be honest about failures.** If a search domain (e.g., "Filtering") is not yielding results, the agent must inform the human and suggest stopping.The agent will suggest new domains (e.g., "Feature Extraction" or "Hardware Change") and ask the human to select **exactly one** to pursue. Always maintain the option for hardware iteration (sensor repositioning, BOM changes). We are solving a failure mode, not developing "beautiful" but fragile algorithms.
-
-9. **BOM optimization** If an algorithm can be implemented with lower-budget hardware/software compared against the sample BOMs (hw_bom.md and sw.bom_md), the agent must explicitly state so and the reasons (e.g., "Lower clock speed," "Reduced sampling rate") in the console. The human determines whether to optimize the BOM. Accepted BOM changes must be documented in CLAUDE.md for full traceability between logic and cost.
-
----
-
-## Learner-in-the-Loop: Signal Plotting for Simulator Efficacy Review
-
-The agent must generate signal plots at key simulation milestones so the human can visually confirm the walker model is physically plausible before trusting the SI output. Plots are the primary tool for catching silent model errors that pass numerical tests (e.g., wrong DC baseline, missing signal morphology, phase drift).
-
-### When to plot
-
-- After any change to `walker_model.py` (new profile, new terrain primitive, ankle rocker fix, etc.)
-- After any change to a filter coefficient in `phase_segmenter.c` or `step_detector.c`
-- When a profile passes step-count criteria but SI looks suspicious
-- Before hardware handoff — plot all 4 profiles side-by-side as a final visual audit
-
-### Plot template
-
-```python
-# Standard 3-panel signal check — copy and adapt per profile
-import sys, math
-import numpy as np
-import matplotlib
-matplotlib.use("Agg")   # headless — no display required
-import matplotlib.pyplot as plt
-sys.path.insert(0, "simulator")
-from walker_model import PROFILES, generate_imu_sequence
-
-profile = PROFILES["<key>"]   # flat / bad_wear / slope / stairs
-samples = generate_imu_sequence(profile, 20, rng=np.random.default_rng(42))
-ODR = 208.0
-t = np.arange(len(samples)) / ODR
-
-fig, axes = plt.subplots(3, 1, figsize=(14, 8), sharex=True)
-# Panel 1: acc_z with expected DC baseline
-# Panel 2: acc_x with slope DC
-# Panel 3: gyr_y with MID→TERM gate at -10 dps
-plt.tight_layout()
-plt.savefig("docs/plots/<profile>_signal_check.png", dpi=150)
+### [CASE NAME] — [DATE]
+Competing Positions: A (Amendment N) vs B (Amendment M)
+Physical/Empirical Basis: [the measurement or signal that decided the case]
+Ruling: [which position prevailed and the condition under which it applies]
+Precedent Effect: [future situations this ruling governs]
+Files Changed: [list]
 ```
 
-Open with: `open docs/plots/<profile>_signal_check.png`
+---
 
-All plots are saved to `docs/plots/` for project traceability.
+### The Stair Walker Case — 2026-03-27
 
-### Slope walker signal check — confirmed 2026-03-27
+**Competing Positions:**
+- Position A (Amendment 5): Maintain the dual-confirmation gate; it is correct for all profiles that passed validation.
+- Position B (Article I): The dual-confirmation gate embeds a terrain-specific assumption not derived from any walking primitive — it must be replaced.
 
-**Plot:** `docs/plots/slope_walker_signal_check.png`
+**Physical/Empirical Basis:**
+Signal diagnostic (docs/plots/stair_walker_signal_check.png): gyr_y zero-crossing at 53ms, acc_filt peak at 188ms — temporal gap of 135ms on stairs. The 40ms confirmation window was derived from flat-ground heel-strike kinematics where both events are co-incident. This assumption was not derivable from the three walking primitives. Push-off plantar-flexion traces directly to cadence and step_length (push-off angular velocity = f(step_length, cadence)) and is present on every terrain without exception.
 
-![Slope walker signal](docs/plots/slope_walker_signal_check.png)
+**Ruling:**
+Position B prevails. The dual-confirmation gate is replaced by the push-off primary detector with retrospective ring-buffer heel-strike inference. Any future step detector primary trigger must be a signal feature that is biomechanically required on all terrains and derivable from at least one walking primitive.
 
-**Three observations confirmed by human review:**
+**Precedent Effect:**
+Time-gated co-occurrence windows that assume simultaneous signal events are not permitted unless the simultaneity is derived from and bounded by a walking primitive.
 
-1. **acc_z DC reduction is correct.** Walking mean = 8.92 m/s² vs g·cos(10°) = 9.66 m/s². The −0.75 m/s² deficit comes from swing-phase samples (acc_z drops to ~2.5 m/s² during swing) pulling the per-cycle mean below the stance baseline. Correct behaviour: the DC reduction is present during stance, and calibration on hardware will see it as a persistent undercount of gravity — exactly the terrain-induced bias the algorithm cannot distinguish from horizontal acceleration.
-
-2. **acc_x DC injection is correct.** Mean ≈ 1.51 m/s² vs g·sin(10°) = 1.70 m/s²; same swing averaging deficit. The 10° slope projects a constant gravity component onto acc_x throughout the session. This is the signal that makes the standard flat-ground SI algorithm report corrupted values on slope — the key failure mode the stair/slope terrain tests exist to capture.
-
-3. **gyr_y gate is reliably crossed.** Every step shows the initial dorsiflexion dipping below −10 dps (MID→TERM gate, purple dashed line), the ankle rocker 2 ramp sustaining negative gyr_y through mid-stance, and strong push-off peaks at ~178 dps. Consistent with 18 snapshots per 100-step run and SI = 0.0% — the phase segmenter cycles correctly on slope terrain.
+**Files Changed:** `src/gait/step_detector.c`, `simulator/terrain_aware_step_detector.py`
 
 ---
 
-### Stair walker signal check — confirmed 2026-03-27
+### The VABS.F32 Case — 2026-03-28
 
-**Plot:** `docs/plots/stair_walker_signal_check.png`
+**Competing Positions:**
+- Position A (Amendment 5): Healthy walkers passing all Stage 3 exit criteria (SI < 3%) is sufficient; the VABS.F32 discrepancy is a simulator artifact with no clinical consequence.
+- Position B (Article I + Amendment 4): A failure mode is only confirmed caught if it is tested under conditions where the correct answer is non-zero. SI correctness for healthy walkers does not constitute a test of the SI computation under asymmetric input.
 
-![Stair walker signal](docs/plots/stair_walker_signal_check.png)
+**Physical/Empirical Basis:**
+Pathological walker test: true SI = 25% injected via ±45ms alternating stance offset. Firmware reported SI = 0.0% across all 9 snapshots on all 4 profiles despite 100/100 steps detected. DBG_SNAP diagnostic confirmed n_odd=9, n_even=10, stance_odd=482ms, stance_even=388ms — expected SI ≈ 21%, reported SI = 0.0%. Root cause: `VABS.F32` ARM FPU instruction returns ≈0 instead of |x| in Renode 1.16.1 for computed FPU-register values. `fabsf(m_odd - m_even)` was silently zeroing every SI computation where the result was non-zero.
 
-**Failure mode: dual-confirmation timing mismatch (BUG-010, RESOLVED 2026-03-27)**
+**Ruling:**
+Position B prevails. The pathological walker test (true SI = 25%, all four profiles, all above 10% clinical threshold) is now a mandatory Stage 3 exit criterion. `fabsf()` on FPU-register values is banned in this codebase; the conditional subtraction pattern `(diff >= 0.0f) ? diff : -diff` is the required replacement. Any future function that computes a quantity that could silently return a "correct-looking" zero must be validated under input conditions where the correct answer is non-zero.
 
-Original result: **0/100 steps detected** in firmware ELF running on virtual nRF52840.
-Fixed result: **100/100 steps, SI=0.41%** — Option C terrain-aware step detector.
+**Precedent Effect:**
+"No crash" is not a passing criterion. "Correct output for inputs where the correct answer is known to be non-zero" is the required criterion for any clinical-output computation.
 
-Signal-level measurements from the diagnostic plot:
-
-| Signal | Flat walker | Stair walker |
-|---|---|---|
-| acc_filt peak | 7.44 m/s² (above 5.0 threshold) | 7.44 m/s² (above 5.0 threshold) |
-| acc_filt peak timing | phase 0.57 (572ms) | phase 0.425 (188ms into stance) |
-| gyr_y zero-crossing | phase 0.03 (34ms) | phase 0.10 (53ms into stance) |
-| Temporal separation | 538ms | **135ms** |
-| Verdict | steps detected correctly | **TIMEOUT — step discarded** |
-
-**Root cause — broken kinematic assumption:**
-The dual-confirmation gate assumes heel-strike biomechanics: heel impact simultaneously drives an `acc_filt` impulse and arrests plantar-flexion (forcing a `gyr_y` sign reversal). These two events are co-incident on flat ground. On stairs, the foot contacts at mid/forefoot — gyr_y crosses at 53ms, acc_filt peaks at 188ms, 135ms gap exceeds the 40ms window.
-
-**Fix — Option C terrain-aware detector + ring-buffer heel-strike inference:**
-
-Algorithm inversion: gyr_y_hp push-off burst (>30 dps, universal across all terrains) becomes
-the primary trigger. acc_filt > adaptive threshold since last step is the confirmation.
-Push-off is biomechanically universal — no terrain allows walking without plantar-flexion.
-
-Option C ring buffer (8 entries, ~32 bytes RAM): stores rejected acc_filt threshold crossings
-since last confirmed step. On push-off, oldest entry is used as retrospective heel-strike
-timestamp → phase_segmenter.c receives physically correct timing, no contract change.
-
-**Renode bare-metal validation (2026-03-27):**
-
-| Profile | Original | Option C | SI |
-|---|---|---|---|
-| Flat | 100/100 | 100/100 | 0.04% ✓ |
-| Bad wear | 100/100 | 100/100 | 0.04% ✓ |
-| Slope (10°) | 100/100 | 100/100 | 0.84% ✓ |
-| **Stairs** | **0/100** | **100/100** | **0.41% ✓** |
-
-Full hunting procedure, design decisions, and validation plots: `docs/algorithm_hunting_stair_walker.md`
-Python reference implementation: `simulator/terrain_aware_step_detector.py`
-C implementation: `src/gait/step_detector.c`
-Report: `docs/reports/gait_simulation_report_2026-03-27.pdf`
+**Files Changed:** `src/gait/rolling_window.c`
 
 ---
 
-## HW-SW Co-Design Procedure — Equivalence to Software Development
+### The CNN Prior Seeding Case — 2026-03-28
 
-This section maps the agentic hardware-software co-design procedure used in this project to standard software development concepts. Use it to onboard engineers familiar with software CI/CD but new to hardware-in-the-loop development.
+**Competing Positions:**
+- Position A (Amendment 13): Pre-filling the rolling window with synthetic records is a calibration that permanently biases the window; one calibration per algorithmic iteration must be justified.
+- Position B (Article I + Amendment 5): The cold-start artifact (SI_swing = 200% at first snapshot) has a known physical cause (ring buffer ghost step from calibration period); the synthetic prior is derived from the three walking primitives at 105 spm using the physiological 60/40 stance/swing constant, not tuned empirically.
 
-The key structural difference from pure software: **staging and production are physically different substrates** (virtual silicon vs. real silicon). A regression that slips into a flashed ELF cannot be patched with `git revert`. The simulation pipeline is the test harness. The handoff document is the release notes. The physical device is the immutable deploy.
+**Physical/Empirical Basis:**
+Renode simulation (all 4 profiles): SI_swing = 200% at first snapshot regardless of actual asymmetry. Diagnostic: ring buffer entry from stationary calibration period produced heel-strike timestamp ≈ 4.8ms, yielding stance ≈ 1534ms (3× normal). Synthetic prior derivation: stance=343ms = 60% of 571ms step period at 105 spm. The 60/40 stance/swing split is a measured physiological constant, not a tuned value. Priors are symmetric (identical odd/even) → contribute exactly 0% SI. Priors evict naturally from the 200-entry buffer after 200 real steps.
 
-| Software Dev Concept | This Project's Equivalent |
-|---|---|
-| `git init` | Stage 1: write firmware C files — establishes the ground truth that all downstream stages verify |
-| `git commit` | Confirmed stage exit criterion — each `[x]` in CLAUDE.md is a durable, auditable checkpoint |
-| `git branch` | New walker profile or failure mode — isolated line of investigation that cannot break passing profiles |
-| `git diff` | Signal plots + UART snapshot table before/after an algorithm change — the human-readable "what changed" |
-| `git push` | Stage 5: flash ELF to physical hardware — irreversible within a session; same caution applies |
-| `git pull` | Re-running simulation after a firmware edit — pulling latest algorithm behaviour into the test harness |
-| `git merge` | Merging a simulation branch to `main` after all profiles pass — only valid when exit criteria are met |
-| `git revert` | Reverting a phase gate threshold or filter coefficient, re-running all 4 profiles to confirm no regression |
-| Unit tests (`pytest`) | `pytest simulator/tests/` + PlatformIO native tests — fast, no hardware, catches interface contract breaks |
-| Integration tests | Renode bare-metal simulation — real ELF, virtual Cortex-M4F, all 4 profiles × 100 steps |
-| Staging environment | Renode + `zephyr.elf` — functionally identical to production hardware, zero hardware risk |
-| Production deployment | Physical XIAO nRF52840 with LiPo — the only irreversible step in the pipeline |
-| CI/CD pipeline | The 7-layer digital twin — deterministic, automated, identical path every run |
-| Code review | Learner-in-the-loop: human reviews signal plots and snapshot tables at each milestone before advancing |
-| Feature flag | `CONFIG_GAIT_UART_EXPORT` Kconfig symbol — enables BLE export path without affecting the production binary |
-| Hotfix branch | Bug hunt branch (e.g. `ble-export-sim`) — isolated space to fix one failure mode |
-| Release candidate | `handoff-testing` branch — all Stage 3 criteria confirmed, docs written, ready for external validation |
-| Bug tracker | `docs/bug_receipt.md` — symptom, root cause, fix, files changed; permanent record across all sessions |
-| Regression test | Running all 4 walker profiles after any algorithm change — a profile that was passing must remain passing |
-| `git blame` | CLAUDE.md stage records + bug receipt — traces every threshold and design decision to a human confirmation |
-| Rollback plan | Three-strike rule (Rule 5) — after 3 failed attempts, stop and escalate rather than compound technical debt |
+**Ruling:**
+Position B prevails with the constraint of Amendment 13: this prior derivation is the one calibration for this algorithmic iteration. The cadence convergence transient (first 3–4 snapshots show cadence closer to 105 spm than actual) is documented in `docs/handoff.md` Section 8 as an expected and predicted deviation.
+
+**Precedent Effect:**
+Synthetic priors are permitted as a cold-start mechanism if and only if: (a) prior values are derived from walking primitives using documented physiological constants; (b) priors are symmetric and contribute zero SI; (c) they evict naturally within one full window cycle; (d) the convergence transient is documented in the handoff document.
+
+**Files Changed:** `src/gait/rolling_window.c`, `src/gait/phase_segmenter.c`
 
 ---
 
-## Agentic Co-Design Flow — Human vs. Agent Responsibilities
+### The Terrain Gate Case — 2026-03-27
 
-The agent runs the simulation loop autonomously. The human owns every decision that changes the physical or algorithmic direction of the project. The boundary is: **agent executes, human decides.**
+**Competing Positions:**
+- Position A (Amendment 3): The LOADING→MID_STANCE gate references `acc_mag` which is also used in the step detector — this may be a cross-layer coupling.
+- Position B (Article I): The `acc_mag` gate (`|acc_mag − 9.81| < 2.94`) was derived from flat-ground physics and must be replaced with a terrain-agnostic gate derivable from a walking primitive.
 
-```
-Stage 1 — Firmware
-  [AGENT]  Write C firmware files (step_detector, phase_segmenter, rolling_window, session_mgr)
-  [AGENT]  Run PlatformIO native unit tests, report pass/fail
-  [HUMAN]  Review failing tests — decide whether to fix firmware or accept known limitation
-  [HUMAN]  Confirm Stage 1 exit criteria met before proceeding
+**Physical/Empirical Basis:**
+Stair walker stuck permanently in LOADING phase. `acc_mag` at stair mid-stance ≈ 20 m/s² due to heel-strike impact. Gate: |20 − 9.81| = 10.2 >> 2.94 — never fires. Physical measurement: heel-strike arrest decays from 37–60 dps to near-zero in ~100ms on all terrains; early ankle rocker is 10–13 dps. The bisection point of 20 dps is terrain-invariant because it is derived from the gyr_y decay dynamics of foot-floor contact, which is governed by stance mechanics, not surface type.
 
-Stage 2 — Software
-  [AGENT]  Write Python simulator (walker_model, signal_analysis, renode_bridge)
-  [AGENT]  Run pytest simulator/tests/, report pass/fail
-  [HUMAN]  Review any test failures — confirm fix direction
-  [HUMAN]  Confirm Stage 2 exit criteria met before proceeding
+**Ruling:**
+Position B prevails (Article I takes precedence). Gate replaced with `|gyr_y| < 20 dps`. The VSQRT.F32 workaround was also removed because the acc_mag computation that required it is eliminated. Any phase transition gate that references a computed quantity must justify its terrain-invariance; if it cannot, it must be replaced by a raw axis gate derivable from walking primitive mechanics.
 
-Stage 3 — Simulation
-  [AGENT]  Build ELF (two-step ninja), launch Renode, run all profiles, parse UART output
-  [AGENT]  Generate signal plots after any walker_model or algorithm change
-  [HUMAN]  *** MANDATORY: review signal plots — confirm physical plausibility before trusting SI output ***
-  [AGENT]  Print intermediate snapshot tables to console after each profile run
-  [HUMAN]  *** MANDATORY: review console results — explicitly confirm or redirect before next action ***
-  [AGENT]  Propose algorithm fix domain (filtering / feature extraction / hardware change)
-  [HUMAN]  *** MANDATORY: select exactly one domain to pursue (Rule 8) — agent must not self-select ***
-  [AGENT]  Implement fix, re-run all profiles, check regression
-  [HUMAN]  If three attempts fail (Rule 5): agent stops, human determines next step
-  [HUMAN]  Confirm Stage 3 exit criteria met before proceeding
+**Precedent Effect:**
+Computed quantities used in phase transition gates require explicit terrain-invariance justification traceable to a walking primitive. Flat-ground-derived thresholds are not terrain-invariant by default.
 
-Stage 4 — Edge Cases
-  [AGENT]  Write and run edge case unit tests (zero-step, saturation, mounting offset, etc.)
-  [AGENT]  Run Renode under adversarial inputs, report any fault or assertion
-  [HUMAN]  Review edge case failures — decide accept / fix / defer to hardware
-  [HUMAN]  Confirm Stage 4 exit criteria met before proceeding
-
-Stage 5 — Hardware Deployment
-  [HUMAN]  *** MANDATORY: approve ELF flash — irreversible, no agent autonomy here ***
-  [AGENT]  Provide flash command and bring-up checklist; record RTT/UART output
-  [HUMAN]  Execute bench bring-up sequence (WHO_AM_I, calibration, 100-step walk)
-  [HUMAN]  Compare hardware results to simulation predictions in docs/handoff.md
-  [HUMAN]  Declare Stage 5 pass/fail; file any new hardware porting bugs
-```
-
-### Decision Gates — When the Agent Must Stop and Wait
-
-| Trigger | Why human must decide | Rule |
-|---|---|---|
-| Signal plot generated after any model/algorithm change | Agent cannot judge physical plausibility of a biomechanical signal | Learner-in-the-loop |
-| Console results printed after a simulation run | Intermediate data may reveal a direction the agent cannot infer | Rule in Measurement Philosophy |
-| Algorithm search domain exhausted with no fix | Choosing between filtering / feature extraction / hardware is a design tradeoff, not a computation | Rule 8 |
-| Three consecutive failed fix attempts | Continuing compounds token debt and masks the real root cause | Rule 5 |
-| Stage N → Stage N+1 transition | Exit criteria require explicit human confirmation — never assumed | Rule 3 |
-| BOM change opportunity identified | Cost vs. capability tradeoff is a business decision, not an engineering computation | Rule 9 |
-| Hardware flash | Irreversible within a session; no amount of simulation certainty removes this gate | Rule 7 |
-| Any new calibration constant proposed | One calibration per algorithmic iteration — human validates the physical derivation | Measurement Philosophy |
+**Files Changed:** `src/gait/phase_segmenter.c`
 
 ---
 
-## Pathological Walker Validation — The Critical Proof-of-Concept (2026-03-28)
+### The Algorithm Comparison Case — 2026-03-28
 
-**This is the session that validated the entire venture.**
+**Competing Positions:**
+- Position A (Amendment 9): Three algorithm options (A: threshold tuning; B: filter redesign; C: push-off primary with ring buffer) were evaluated; Option C was selected after exhausting A and B. This is a valid domain search under Amendment 9.
+- Position B (Amendment 10): Option C adds firmware complexity (ring buffer, extra FSM state); the hardware alternative (shoe-dorsum sensor repositioning for cleaner forefoot-to-flat terrain discrimination) was not formally evaluated as required by Amendment 9.
 
-### What was done
+**Physical/Empirical Basis:**
+Options A and B failed on stair profile (0/100 steps). Option C: 100/100 steps, SI = 0.41% on stairs. RAM overhead: 32 bytes for ring buffer (0.03% of 118KB SRAM). Flash overhead: < 200 bytes. Shoe-dorsum mounting assessed: requires different form factor, different strap BOM, different user calibration — cost exceeds 32 bytes of firmware complexity. Additionally, algorithm comparison GUI revealed Option C also resolves poor device fit (bad_wear) SI underestimation in pathological mode — a second failure mode resolved by the same architectural change.
 
-After all four healthy walkers were confirmed passing at Stage 3, the human requested a pathological simulation: inject a known 25% true SI asymmetry into all four walker profiles and verify the firmware running on a virtual Cortex-M4F correctly reports SI > 10% (the Robinson et al. clinical threshold).
+**Ruling:**
+Position A prevails. Option C is accepted. However, the shoe-dorsum mounting option is not closed — it is documented in `docs/hw_bom.md` as an open hardware iteration item. An agent may not remove this item without a new hearing. BOM alternatives are never silently closed by algorithm success alone.
 
-This required two new capabilities:
-1. **Python path warmup fix** (`gait_algorithm.py`): discard first 10 step records from the rolling window so the adaptive threshold history fills before snapshots begin — mirrors the Renode path's 450-sample stationary prefix. Without this fix, early snapshots on the Python path were inflated by a partially-warm threshold.
-2. **`si_stance_true_pct` wired into signal generation** (`walker_model.py`): the field existed but was metadata only. Now `_generate_step()` uses it to apply an alternating ±delta stance offset on odd/even steps. For 25% SI at 100 spm: delta = 25 × 360ms / 200 = 45ms. The affected limb (odd steps) gets +45ms; the reference limb (even steps) gets −45ms.
-3. **Pathological toggle in the UI** (`app.py`, `pipeline.py`): sidebar toggle applies `si_override=25.0` to all four profiles at runtime without modifying the profile definitions.
+**Precedent Effect:**
+When an algorithm fix is accepted, the hardware alternative that was considered but not selected must be explicitly documented as an open option. Hardware iteration optionality survives algorithm success.
 
-### BUG-013 — VABS.F32 broken in Renode 1.16.1 (critical, now resolved)
-
-Running the pathological flat walker on Renode (firmware ELF on virtual nRF52840) produced **SI = 0.0% across all 9 snapshots** despite 100/100 steps detected.
-
-Diagnostic added to `rolling_window.c::emit_snapshot()` confirmed:
-```
-DBG_SNAP n_odd=9 n_even=10 stance_odd=482 stance_even=388
-SNAPSHOT step=9 si_stance=0.0%
-```
-
-The averaged odd/even stance durations were **482ms vs 388ms** — a 94ms difference, expected SI ≈ 21%. Yet the SNAPSHOT reported 0.0%.
-
-Root cause: `VABS.F32` (ARM FPU absolute value instruction) returns the wrong result in Renode 1.16.1 when applied to a computed FPU-register value (the result of a subtraction). `fabsf(m_odd - m_even)` returned ≈0 instead of 94.0. This is the same class of emulator bug as the previously documented `VSQRT.F32` failure (`step_detector.c`, BUG-013 in that file).
-
-Fix in `rolling_window.c::compute_si_x10()`:
-```c
-// Before (broken on Renode 1.16.1):
-float si = 200.0f * fabsf(m_odd - m_even) / denom;
-
-// After (correct on all targets):
-float diff = m_odd - m_even;
-float abs_diff = (diff >= 0.0f) ? diff : -diff;
-float si = 200.0f * abs_diff / denom;
-```
-The conditional compiles to `VCMP+branch`, avoiding the broken `VABS.F32` instruction.
-
-**Why this bug was invisible before this session:** Healthy walkers produce SI ≈ 0% — both the broken and correct computation agree. The bug only surfaces when there is real asymmetry. Without the pathological test, this would have shipped to hardware and reported SI = 0% for every patient, regardless of actual asymmetry.
-
-### Validated results — 2026-03-28
-
-**Healthy mode (true SI = 0%) — all on Renode:**
-
-| Profile | Steps | Final SI | Verdict |
-|---|---|---|---|
-| Flat | 100/100 | 1.9% | Correct: below 10% threshold ✓ |
-| Bad wear | 100/100 | 0.1% | Correct: below 10% threshold ✓ |
-| Stairs | 100/100 | 2.9% | Correct: below 10% threshold ✓ |
-| Slope 10° | 100/100 | 4.6% | Correct: below 10% threshold ✓ |
-
-*Non-zero healthy SI values are real: step_variability_ms noise creates small but genuine odd/even timing differences. Previously all reported 0.0% due to VABS.F32 bug masking all SI computation.*
-
-**Pathological mode (true SI = 25%) — all on Renode:**
-
-| Profile | Steps | Final SI | Verdict |
-|---|---|---|---|
-| Flat | 100/100 | 17.2% | True positive: above 10% threshold ✓ |
-| Bad wear | 100/100 | 23.8% | True positive: above 10% threshold ✓ |
-| Stairs | 100/100 | 19.3% | True positive: above 10% threshold ✓ |
-| Slope 10° | 100/100 | 22.6% | True positive: above 10% threshold ✓ |
-
-### Why this matters
-
-The SI computation in `compute_si_x10()` is the **only output** the clinical end-user sees. If it is silently zeroed by a hardware emulation bug, the device passes every simulation test and then reports normal gait for every patient it encounters on real hardware.
-
-This is the proof-of-concept working as designed:
-
-```
-Known failure mode (pathological asymmetry)
-    → injected into simulation
-    → firmware running on virtual silicon reported wrong answer (SI=0%)
-    → bug found and fixed before any hardware was fabricated
-    → firmware now correctly reports SI > 10% for 4/4 terrain profiles
-```
-
-No IMU. No nRF52840 board. No patient. Caught in software by injecting a physics-grounded signal and demanding a specific clinical output.
+**Files Changed:** `src/gait/step_detector.c`, `simulator/terrain_aware_step_detector.py`
 
 ---
 
-## Algorithm Comparison Finding — Poor Device Fit (2026-03-28)
+## Appendix A — Stage Definitions and Exit Criteria
 
-**Observed during algorithm comparison overlay (GUI, Python simulation path, pathological mode):**
-
-The original dual-confirmation algorithm underestimates the Symmetry Index for the **poor device fit** profile (`bad_wear`) in pathological mode, while the terrain-aware algorithm reports the correct elevated SI.
-
-### Why this happens
-
-The poor device fit profile (`bad_wear`) introduces signal noise and timing variability from mounting uncertainty — the device shifts on the ankle, introducing small rotational perturbations on every step. The original algorithm's 40ms gyr_y zero-crossing confirmation window is sensitive to this: perturbations smear the exact timing of the gyr_y sign reversal relative to the acc_filt peak. Some steps are dropped or mis-timed, which corrupts the odd/even stance duration balance in the rolling window → the SI is underestimated → the device under-reports asymmetry for a patient who is already compromised by a poorly fitted device.
-
-The terrain-aware algorithm is robust to this because its primary trigger is the **push-off plantar-flexion burst** (gyr_y_hp > 30 dps) — a large-amplitude muscle event that is mechanically decoupled from mounting position. Mounting perturbations do not suppress the push-off burst; they only affect the fine timing of smaller-amplitude events that the original algorithm depended on.
-
-### Clinical implication
-
-This expands the justification for the algorithm search beyond its original scope:
-
-| Original motivation | Extended finding |
-|---|---|
-| Fix stair walker: 0/100 steps detected (terrain biomechanics failure) | Fix poor device fit: SI underestimated in pathological mode (signal morphology robustness) |
-
-The terrain-aware algorithm simultaneously resolves two distinct failure modes:
-1. **Terrain failure** — stair biomechanics break the flat-ground timing assumption (acc peak ↔ gyr_y gap: 135ms >> 40ms window)
-2. **Mounting failure** — poor device fit smears gyr_y confirmation timing → missed steps → corrupted odd/even balance → clinically false-low SI
-
-Both failures share the same root cause: reliance on a precise short-duration timing gate between two signals. The terrain-aware algorithm eliminates that gate entirely by using a biomechanically universal primary trigger.
-
-### Verification
-
-Visible in the GUI algorithm comparison panel: toggle **"Show algorithm comparison"** + **"Simulate gait asymmetry (SI ≈ 25%)"** in algorithm simulation mode. The `bad_wear` dashed line (original) tracks below the `bad_wear` solid line (terrain-aware) — both above threshold, but the original underestimates the magnitude. On the embedded firmware path (Renode), the full quantitative difference is observable.
+*Migrated from the operational project record on the main branch. See `main:CLAUDE.md` Appendix A or the full stage definitions including all exit criteria with confirmation records dated 2026-03-27 and 2026-03-28.*
 
 ---
 
-**The goal of this handoff is not to have the receiving engineer use Claude Code or any AI agent. The goal is that a stubborn old-school hardware fanatic can pick up this work, read the docs, run the simulation, flash the firmware, and independently replicate everything that Claude Code and the developer achieved together — using nothing but a terminal, a compiler, and their own hands.**
+## Appendix B — Simulation Infrastructure Reference
 
+*Migrated from the operational project record on the main branch. See `main:CLAUDE.md` Appendix B or the seven-layer pipeline, boundary table, Renode test template, and invariant infrastructure documentation.*
 
+---
+
+## Appendix C — Signal Plot Template and Review Log
+
+*Migrated from the operational project record on the main branch. See `main:CLAUDE.md` Appendix C or the standard three-panel signal check template and confirmed plot review entries (slope walker, stair walker).*
+
+---
+
+## Appendix D — Agentic Co-Design Flow
+
+*Migrated from the operational project record on the main branch. See `main:CLAUDE.md` Appendix D or the full stage-by-stage agent/human responsibility table and decision gates.*
+
+---
+
+## Appendix E — HW-SW Co-Design Equivalence Map
+
+*Migrated from the operational project record on the main branch. See `main:CLAUDE.md` Appendix E or the git/software development to hardware co-design equivalence table.*
+
+---
+
+## Appendix F — Measurement Philosophy Reference
+
+*Migrated from the operational project record on the main branch. See `main:CLAUDE.md` Appendix F or the derivation chain, three-primitive enforcement rules, and calibration documentation requirements.*
+
+---
+
+## The Mission
+
+The goal is not to have the receiving engineer use Claude Code or any AI agent. The goal is that a stubborn old-school hardware fanatic can pick up this work, read the docs, run the simulation, flash the firmware, and independently replicate everything that Claude Code and the developer achieved together — using nothing but a terminal, a compiler, and their own hands.
