@@ -139,3 +139,26 @@ Expansion: Calibration constants that cannot be traced to a physical measurement
 During any iterative build-debug process, intermediate results must be printed to the console for human review. The agent waits for a human determination before proposing the next action. The specific human decision must be recorded verbatim in CLAUDE.md.
 
 Expansion: This rule prevents the most common failure mode in agentic development: an agent that runs five sub-steps autonomously, encounters an anomaly in step 2, compensates in step 3, and delivers a result in step 5 that looks correct but carries a hidden assumption no human ever approved. The CLAUDE.md record of human decisions is the audit trail.
+
+---
+
+### Amendment 15 — Statistical Derivation Documentation
+*Traces to: Article I*
+*Ratified: 2026-03-29. Proposed by: Claude Sonnet 4.6. Ratified by: sole human engineer.*
+
+Any constant that cannot be derived algebraically from the three walking primitives but is instead derived from a population distribution of one or more primitives must document: the distribution (μ, σ), the sigma bound applied, and any population explicitly excluded from the bound.
+
+Expansion: This amendment closes the gap between Amendment 13 (algebraically derived constants) and constants derived from population statistics of walking primitives. A constant derived from the cadence distribution still traces to Article I — but the statistical path must be made explicit. The failure mode without this rule: statistically derived constants accumulate as undocumented magic numbers that pass Article I review because a primitive is nominally involved, but carry no derivation that predicts their correct value when the target population changes (paediatric, geriatric, athletic). The required documentation format is:
+
+```
+/* CONSTANT_NAME — statistically derived from [primitive].
+ * Population: [description], distribution ~ N(μ, σ²) [units]
+ * Bound: [N]σ upper/lower tail → [value] [units] → CONSTANT = [value]
+ * Excluded population: [any explicitly out-of-scope group and why]
+ * Traces to: [primitive] (Article I). */
+```
+
+First application: `MIN_STEP_INTERVAL_MS = 250` in `src/gait/step_detector.c`.
+Human ambulation cadence ~ N(130, 30²) spm across walking + running population.
+2.5σ upper tail: 205 spm → minimum step period 293 ms → 250 ms with margin.
+Excluded: running downhill (>210 spm, out of scope for SI measurement device).

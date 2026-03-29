@@ -76,6 +76,12 @@ LOG_MODULE_REGISTER(step_detector, LOG_LEVEL_DBG);
 #define HP_CUTOFF_HZ         0.5f
 
 #define PEAK_HISTORY         8
+/* MIN_STEP_INTERVAL_MS — statistically derived from cadence primitive.
+ * Population: human ambulation (walking + running), cadence ~ N(130, 30²) spm.
+ * Bound: 2.5σ upper tail → 205 spm → minimum step period 293 ms → 250 ms with margin.
+ * Excluded: running downhill (>210 spm), out of scope for SI measurement device.
+ * Covers >98.8% of SI-relevant ambulation patterns (3-sigma rule).
+ * Traces to: Cadence primitive (Article I). Amendment 15. */
 #define MIN_STEP_INTERVAL_MS 250
 
 /* Push-off detection threshold (dps).

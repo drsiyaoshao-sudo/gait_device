@@ -42,7 +42,7 @@ Empirical evidence — signal plots, UART output tables, unit test results — i
 
 ## The Amendments
 
-All amendments are maintained in [`docs/gaitsense_code/amendments.md`](docs/gaitsense_code/amendments.md). Amendments 1–14 are currently ratified. New amendments are added to that file through the Amendment Ratification Process below.
+All amendments are maintained in [`docs/gaitsense_code/amendments.md`](docs/gaitsense_code/amendments.md). Amendments 1–15 are currently ratified. New amendments are added to that file through the Amendment Ratification Process below.
 
 ---
 
