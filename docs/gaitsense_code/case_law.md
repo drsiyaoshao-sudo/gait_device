@@ -90,6 +90,30 @@ Computed quantities used in phase transition gates require explicit terrain-inva
 
 ---
 
+### The Dual-Confirmation Architecture Case — 2026-03-29
+
+**Competing Positions:**
+- Position A (Amendment 13 + Amendment 5): The 40ms co-occurrence window is a physically derivable calibration constant, not an architectural error. The correct remediation is to derive the window from `cadence_spm` and `stance_frac` as `stance_frac × (60000 / cadence_spm) × 0.12`, yielding a terrain-adaptive constant. The ring buffer fallback in Position C introduces a stance-duration timing error when no acc_filt crossing is found.
+- Position C (Article I + Amendment 2 + Stair Walker Case precedent): Push-off plantar-flexion (gyr_y_hp) derives directly from cadence and step length. The 40ms window cannot derive from any walking primitive because it encodes flat-ground heel-strike co-incidence — a terrain-specific biomechanical assumption, not a primitive.
+
+**Physical/Empirical Basis:**
+IMU diagnostic plot (`docs/executive_branch_document/plots/stair_vs_flat_imu_diagnostic.png`), generated 2026-03-29 from `diagnostic_imu_analysis.py` against both profiles, 30 steps, seed=42:
+
+- acc_filt peaks on stairs: mean 21.4 m/s² — **57.6% higher than flat** (13.6 m/s²). Peaks are not degraded; both profiles clear the 5.0 m/s² adaptive threshold with margin. Position A's ring buffer fallback risk (from missing acc_filt crossings) is not supported by the signal evidence.
+- Timing gap between acc_filt peak and gyr_y zero-crossing: flat = ~19ms (4/5 steps fire the 40ms window); stairs = ~100ms (0/5 steps fire, including one step with no gyr_y zero-crossing detected at all).
+- The ~100ms structural gap on stairs is not a constant calibration error — it is caused by the sigmoid toe-roll loading geometry of stair contact, which shifts the acc_filt peak rightward by the full body-weight loading interval relative to flat heel-strike. No single window constant can cover both because the two peaks occupy structurally different positions in the gait cycle.
+- The missing gyr_y zero-crossing on stair Step 2 confirms that the confirmation event itself is unreliable on stairs, independent of window width. Even a widened window would not fire when the confirmation event does not occur.
+
+**Ruling:**
+Position C prevails. The Justice ruled that Position A poses a fundamental error conflicting with the Benjamin Franklin Principle (Physics First): stair walker biomechanics differ structurally from flat walker (longer toe-to-heel strike interval, near-single push-off loading pattern). The 40ms window failure is not a miscalibrated constant — it is an architectural assumption that encodes flat-ground heel-strike co-incidence and cannot be corrected by derivation without embedding a hidden terrain classifier. This violates Article I. Enacting Position A would also violate the Thomas Jefferson Principle: a patient ascending stairs with genuine gait asymmetry would receive an undefined SI output (0/5 steps fire), not an inaccurate one. Position C (terrain-aware push-off primary) is confirmed as the constitutionally required architecture.
+
+**Precedent Effect:**
+Any future proposal to restore a co-occurrence timing window as the primary step detection mechanism must first demonstrate, from physical IMU measurements, that the two co-occurring events occupy the same phase of the gait cycle across all terrain profiles under test. Simulation evidence (acc_filt and gyr_y timing tables) is the minimum required evidence for such a claim. A derivation argument alone, without measured timing data, is insufficient under the Benjamin Franklin Principle.
+
+**Files Changed:** No new implementation — ruling confirms existing `src/gait/step_detector.c` (Option C, terrain-aware) and `simulator/terrain_aware_step_detector.py`. Diagnostic script: `diagnostic_imu_analysis.py`.
+
+---
+
 ### The Algorithm Comparison Case — 2026-03-28
 
 **Competing Positions:**
