@@ -96,7 +96,7 @@ Expansion: An agent that continues searching within an exhausted domain without 
 ### Amendment 10 — BOM Optimization Transparency
 *Traces to: Article II*
 
-When an agent identifies that an algorithm change enables lower-cost hardware, it must explicitly state this and the physical reasoning before proceeding. The human decides whether to optimize. Accepted BOM changes must be recorded in CLAUDE.md.
+When an agent identifies that an algorithm change enables lower-cost hardware, it must explicitly state this and the physical reasoning before proceeding. The human decides whether to optimize. Accepted BOM changes must be recorded using versioning of BOMs.
 
 Expansion: BOM changes have supply chain, procurement, and schedule consequences an agent does not possess. BOM changes or hardware specification changes require explicit human authorization.
 
@@ -136,9 +136,9 @@ Expansion: Calibration constants that cannot be traced to a physical measurement
 ### Amendment 14 — Interim Results and Decision Logging
 *Traces to: Article II*
 
-During any iterative build-debug process, intermediate results must be printed to the console for human review. The agent waits for a human determination before proposing the next action. The specific human decision must be recorded verbatim in CLAUDE.md.
+During any iterative build-debug process, intermediate results must be printed to the console for human review. The agent waits for a human determination before proposing the next action. The specific human decision must be recorded verbatim in bug receipt and project memory files.
 
-Expansion: This rule prevents the most common failure mode in agentic development: an agent that runs five sub-steps autonomously, encounters an anomaly in step 2, compensates in step 3, and delivers a result in step 5 that looks correct but carries a hidden assumption no human ever approved. The CLAUDE.md record of human decisions is the audit trail.
+Expansion: This rule prevents the most common failure mode in agentic development: an agent that runs five sub-steps autonomously, encounters an anomaly in step 2, compensates in step 3, and delivers a result in step 5 that looks correct but carries a hidden assumption no human ever approved. The record of human decisions is the audit trail.
 
 ---
 
