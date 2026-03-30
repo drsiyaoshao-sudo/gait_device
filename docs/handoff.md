@@ -606,3 +606,30 @@ If you have built locally, the bridge prefers `.pio/build/xiaoble_sense_sim/zeph
 | `scripts/test_all_profiles_full.py` | Single-command full pipeline verification |
 | `firmware/zephyr_sim_2026-03-28.elf` | Pre-built validated ELF — BUG-013 fixed, all 4 profiles × healthy + pathological confirmed |
 | `boards/xiao_ble_sense.overlay` | Device tree — **update GPIO pins before standalone XIAO assembly** |
+
+**Items to look at
+
+**1. Hardware Assembly & BOM Verification
+BOM Accuracy: Does every component listed in the Bill of Materials (BOM) match a currently orderable SKU on a major distributor site (e.g., DigiKey)?
+
+Visual Inspection: Can a tester identify every pinout and sensor orientation on the physical PCBA/Breadboard using only the diagrams provided in this branch?
+
+Physical Assembly: Can a user from a non-hardware background successfully connect the sensor to the microcontroller without referring to external tutorials or AI help?
+
+**2. Environment & Toolchain Deployment
+One-Step Setup: Follow the README.md instructions from a clean OS state (no pre-installed ARM tools). Does the build fail due to any missing apt-get or brew commands?
+
+Compiler Parity: When the user runs make or the build script, does the resulting binary match the expected size and checksum provided in the release notes of this branch?
+
+Renode Integration: Can the tester launch the simulation environment and see the emulated firmware boot without encountering "File not found" or "Path mismatch" errors?
+
+**3. Signal Integrity
+Simulation: Can tester reproduce gait imbalance inaccuracy and step count inaccuracy documented in the bug list of both algorithm simulation and firmware simulation?
+
+Hardware bring-up: Can tester pass all the testing procedures built in this hand-off document for hardware?
+
+**4. Technical Documentation Clarity
+
+The "Zero-AI" Walkthrough: Can a human follow the docs/handoff.md from start to finish to get a "Success" LED blink without needing to search a single error message on Google or ChatGPT?
+
+Troubleshooting Logic: Can tester troubleshoot all the project level bugs documented in bug_receipt.md with its own guidance?
