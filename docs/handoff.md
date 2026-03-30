@@ -607,7 +607,7 @@ If you have built locally, the bridge prefers `.pio/build/xiaoble_sense_sim/zeph
 | `firmware/zephyr_sim_2026-03-28.elf` | Pre-built validated ELF — BUG-013 fixed, all 4 profiles × healthy + pathological confirmed |
 | `boards/xiao_ble_sense.overlay` | Device tree — **update GPIO pins before standalone XIAO assembly** |
 
-** Items to look at
+** Items to look at **
 
 *** 1. Hardware Assembly & BOM Verification
 
@@ -631,7 +631,7 @@ Renode Integration: Can the tester launch the simulation environment and see the
 
 []Hardware bring-up: Can tester pass all the testing procedures built in this hand-off document for hardware?
 
-**4. Technical Documentation Clarity
+*** 4. Technical Documentation Clarity
 
 []The "Zero-AI" Walkthrough: Can a human follow the docs/handoff.md from start to finish to get a "Success" LED blink without needing to search a single error message on Google or ChatGPT?
 
