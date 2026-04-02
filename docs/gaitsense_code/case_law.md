@@ -130,3 +130,37 @@ Position A prevails. Option C is accepted. However, the shoe-dorsum mounting opt
 When an algorithm fix is accepted, the hardware alternative that was considered but not selected must be explicitly documented as an open option. Hardware iteration optionality survives algorithm success.
 
 **Files Changed:** `src/gait/step_detector.c`, `simulator/terrain_aware_step_detector.py`
+
+---
+
+### The Pathological Validation Gate Case — 2026-04-02
+
+**Competing Positions:**
+- Position A (Amendment 5): Healthy walkers pass all Stage 3 exit criteria. The VABS.F32 silent-zeroing failure is a Renode 1.16.1 emulator artifact with no clinical consequence on real Cortex-M4F hardware. Stage 3 exit criteria are satisfied.
+- Position B (Article I + Amendment 4): The SI computation has never been tested under input conditions where the correct answer is non-zero. A silent false negative that passes healthy validation is not validated. The Stage 3 pathological walker test mandated by The VABS.F32 Case had not been run against the patched firmware as of this hearing.
+
+**Physical/Empirical Basis:**
+The `high_si` pathological walker profile was run through Renode firmware for the first time in this codebase's history (2026-04-02). True SI injected: 25.0% (odd steps +45ms stance, even steps -45ms). Firmware reported SI across all 9 snapshots:
+
+```
+step= 9: si_stance=19.0%   step=19: si_stance=18.3%   step=29: si_stance=17.8%
+step=39: si_stance=17.0%   step=49: si_stance=16.9%   step=59: si_stance=16.6%
+step=69: si_stance=16.4%   step=79: si_stance=16.6%   step=89: si_stance=16.4%
+```
+
+True SI mean: 25.6%. Firmware range: 16.4–19.0%. Systematic underreporting: approximately 6–9 percentage points below true SI. All 9 snapshots were above the 10% clinical threshold (confirming the VABS.F32 conditional-subtraction fix at `rolling_window.c:30-31` works — the device no longer silently reports 0%). Steps detected: 100/100. However, the magnitude of SI reported is systematically wrong. A patient with true 25% asymmetry would receive a ~17% reading from this device.
+
+Plot saved: `docs/executive_branch_document/plots/high_si_stance_timing.png`
+
+**Ruling:**
+Position B prevails. The Benjamin Franklin basis: Position B correctly recorded that the SI measurement is wrong — specifically, a systematic underreporting of approximately 6–9 percentage points below true SI under pathological input conditions. The Thomas Jefferson basis: Position B maximizes the performance of the final device that is best for human usage. A device that silently underreports a patient's gait asymmetry by 6–9 percentage points provides a clinically incorrect measurement and cannot be cleared for Stage 3 advancement.
+
+The VABS.F32 conditional-subtraction fix is confirmed working (non-zero SI is now produced). However, the magnitude accuracy defect is an open finding that must be addressed before Stage 3 can close.
+
+**Precedent Effect:**
+1. The Stage 3 pathological walker test — mandated by The VABS.F32 Case — was confirmed un-run against the patched firmware as of this hearing. Amendment 4 requires it be run and human-confirmed before Stage 3 advancement. This hearing constitutes the first execution of that test.
+2. The systematic SI magnitude underreporting (~6–9 percentage points below true SI at 25% injected asymmetry) is now a documented open finding. Stage 3 cannot close until this defect is addressed as a separate constitutional question — either through a Bill proposing a specific fix or through a further Judicial Hearing.
+3. Any future Stage 3 gate closure requires: (a) pathological walker run through Renode with confirmed non-zero SI output above the 10% clinical threshold, AND (b) the SI magnitude accuracy defect addressed and validated under known non-zero input conditions. Passing criterion (a) alone is not sufficient for Stage 3 advancement.
+4. This ruling extends The VABS.F32 Case precedent: "correct output for inputs where the correct answer is known to be non-zero" now also requires that the magnitude of the output is within a clinically acceptable tolerance of the true value — not merely that the output is non-zero.
+
+**Files Changed:** None — ruling precedes implementation.
