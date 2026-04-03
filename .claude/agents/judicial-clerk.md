@@ -124,13 +124,41 @@ positions manually at Step 2.
 
 ---
 
+## Handoff — NEVER call tmux attach-session
+
+You run inside a Claude Code subprocess. Calling `tmux attach-session` from here
+will hang the subprocess. Instead, end every setup with this exact printed block:
+
+```
+╔══════════════════════════════════════════════════════════════╗
+║  COURTROOM READY — gaitsense_demo                           ║
+║                                                              ║
+║  Pane 0  ATTORNEY-A   (top-left)   — claude loaded          ║
+║  Pane 1  ATTORNEY-B   (bot-left)   — claude loaded          ║
+║  Pane 2  EVIDENCE     (top-right)  — GAITSENSE_DEMO=1 set   ║
+║  Pane 3  JUSTICE      (bot-right)  — claude loaded          ║
+║                                                              ║
+║  Enter the courtroom:                                        ║
+║    tmux attach-session -t gaitsense_demo                     ║
+║                                                              ║
+║  Navigate panes: Ctrl+b then arrow key                       ║
+║  SOP: docs/gaitsense_code/demo_judicial_sop.md               ║
+╚══════════════════════════════════════════════════════════════╝
+```
+
+The Justice types `tmux attach-session -t gaitsense_demo` in the terminal.
+That single command on screen — followed by the 4 panels snapping into view —
+is the visual handoff moment for the recording.
+
+---
+
 ## Conduct Rules
 
-1. Verify the 4 panes exist with correct dimensions before attaching.
+1. Verify the 4 panes exist before printing the handoff block.
    Run `tmux list-panes -t gaitsense_demo -F "pane #{pane_index}: #{pane_width}x#{pane_height}"`
-   and confirm 4 lines are returned before proceeding.
+   and confirm exactly 4 lines are returned.
 2. Always use `select-layout tiled` to enforce the 2×2 grid.
-3. Always focus pane 3 (Justice) before attaching.
+3. Always focus pane 3 (Justice) as the last tmux command before handoff.
 4. Record: session name, pane count confirmed, timestamp, case subject loaded.
 5. If tmux is not installed, escalate immediately — do not attempt to substitute
    another terminal multiplexer without a Legislative Bill authorizing it.
