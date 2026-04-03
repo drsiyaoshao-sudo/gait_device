@@ -5,14 +5,14 @@ const pillars = [
     number: "01",
     title: "Physics-Native Simulation",
     description:
-      "We don't inject sensor readings — we inject first-order physical quantities. Our digital twin starts from biomechanics, electromagnetics, or thermodynamics and derives every signal from ground truth.",
+      "We don't inject sensor readings — we inject first-order physical quantities. Our digital twin starts from biomechanics, electromagnetics, or thermodynamics and derives every signal from ground truth. Physics informed neural network (PINN) integration allows hidden hardware failures captured in minutes, not weeks.",
     color: "accent",
   },
   {
     number: "02",
     title: "Instruction-Level Validation",
     description:
-      "Your actual C firmware runs on an emulated Cortex-M4F inside our pipeline. Not a mock, not a model — the real ELF binary, executing real ARM instructions on a cycle-accurate simulator.",
+      "Your actual C firmware runs on an emulated depolyment environment inside our pipeline. Not a mock, not a model — the real ELF binary, executing real ARM instructions on a cycle-accurate simulator.",
     color: "emerald",
   },
   {

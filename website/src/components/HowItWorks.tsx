@@ -3,21 +3,21 @@ import SectionHeading from "./SectionHeading";
 const layers = [
   {
     num: 1,
-    name: "Walker Model",
-    tech: "Python + NumPy",
-    description: "Physical signal generation from first-order biomechanical primitives",
+    name: "Physics driven simulation",
+    tech: "PINN + Multiphysics Simulator interface",
+    description: "Physical signal generation from first-order physics primitives as simulator input",
     color: "bg-accent",
   },
   {
     num: 2,
-    name: "IMU Quantization",
-    tech: "Sensor Modeling",
-    description: "16-bit quantization at real sensor sensitivity (LSM6DS3 FIFO format)",
+    name: "Sensor Modeling",
+    tech: "Agentic sensor data translation",
+    description: "AI Agent automatically processes sensor spec, and generates high-fidelity sensor data with a click",
     color: "bg-accent-light",
   },
   {
     num: 3,
-    name: "I2C Peripheral Stub",
+    name: "Peripheral manager",
     tech: "Renode Python API",
     description: "Emulated sensor registers, FIFO queue, and hardware interrupts",
     color: "bg-emerald",
@@ -25,8 +25,8 @@ const layers = [
   {
     num: 4,
     name: "Full-System Emulation",
-    tech: "Cortex-M4F in Renode",
-    description: "Real firmware ELF executing on cycle-accurate ARM emulator",
+    tech: "ARM/RISC-V cores in Renode",
+    description: "Real firmware ELF executing on cycle-accurate processor emulators",
     color: "bg-emerald-light",
   },
   {
@@ -45,9 +45,9 @@ const layers = [
   },
   {
     num: 7,
-    name: "Visualization",
-    tech: "Streamlit + Plotly",
-    description: "Interactive dashboards comparing Python reference vs. firmware output",
+    name: "Diagnosis",
+    tech: "Automatic API generation for prototype hardware and data visualization",
+    description: "Interactive diagnosis of hardware performance and comparison with simulation, allowing human engineers' design decision verdicted 100x times faster",
     color: "bg-rose",
   },
 ];
@@ -132,8 +132,7 @@ export default function HowItWorks() {
             ))}
           </div>
           <p className="mt-4 text-sm text-slate-500">
-            Every step must be confirmed correct before advancing. Hardware is
-            expensive to debug — everything before it is not.
+            Master AI agent orchestrates hardware design flow, beauracratic agents execute simulation and probing, key design decisions debated before human engineer in judicial style for arbitration, all followed by project consitutions.  
           </p>
         </div>
       </div>
