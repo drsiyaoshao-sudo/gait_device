@@ -164,3 +164,41 @@ The VABS.F32 conditional-subtraction fix is confirmed working (non-zero SI is no
 4. This ruling extends The VABS.F32 Case precedent: "correct output for inputs where the correct answer is known to be non-zero" now also requires that the magnitude of the output is within a clinically acceptable tolerance of the true value — not merely that the output is non-zero.
 
 **Files Changed:** None — ruling precedes implementation.
+
+---
+
+### The BUG-013 Pathological False Negative Hearing — 2026-04-03
+
+**Competing Positions:**
+- Position A (Amendment 1): The bug is a logic error in the SI computation path in the simulation, but SI=0% is the correct output given the current test scope. The project intention is to solve SI hallucination in healthy walkers on stairs — the Stage 3 test suite contains no SI non-zero instances. Amendment 1 binds Stage 3 to its stated exit criteria; those criteria require SI≈0% for symmetric walkers only.
+- Position B (Article I + Amendment 4 + Amendment 8): The problem causes false negatives in pathological non-zero SI patients. This is a recall-level error — a clinically dangerous systematic suppression of SI that causes the device to report SI=0% in patients with genuine gait asymmetry. The fix is necessary under the Thomas Jefferson Principle to maximize device performance.
+
+**Physical/Empirical Basis:**
+Fresh ELF built from current source (BUG-013 `fabsf()` revert active, confirmed at `rolling_window.c:31`, compiled 2026-04-03) was run against the `high_si` pathological walker profile (true SI=25.0%, ±45ms alternating stance offset) for 100 steps in Renode firmware simulation. Results:
+
+```
+All 9 snapshots: SI_stance = 0.0%   (true SI = 25.0%)
+Steps detected: 100/100
+SESSION_END: steps=100
+Systematic error: −25.0 percentage points — total false negative
+```
+
+Plot saved: `docs/executive_branch_document/plots/high_si_bug013_infected.png`
+
+Root cause confirmed: `VABS.F32` ARM FPU instruction returns ≈0 in Renode 1.16.1 for computed FPU-register values. `fabsf(diff)` in `compute_si_x10()` silently zeroes every SI computation. A patient with true 25% gait asymmetry receives a reading of 0.0% — complete clinical false negative.
+
+The prior simulation (2026-04-02, pre-built ELF) showing 16.4–19.0% SI was built from the conditional-subtraction fix, not the BUG-013 infected source. The magnitude underreporting (~8.4 pp below true SI) observed in that run is a separate open finding — it is not caused by BUG-013, and its root cause is not yet identified.
+
+**Ruling:**
+Position B prevails. The Benjamin Franklin basis: the freshly built BUG-013 infected ELF produced SI=0.0% for all 9 snapshots against a patient with true SI=25% — a total false negative confirmed by physical simulation evidence. The Thomas Jefferson basis: the fix is necessary to maximize device performance and give patients the most accurate measurement of their own gait. The conditional-subtraction fix (`(diff >= 0.0f) ? diff : -diff`) must be restored in `rolling_window.c:31`.
+
+The SI magnitude underreporting (~8.4 percentage points below true SI) observed in the pre-built conditional-subtraction ELF is documented as a separate open finding. Its root cause investigation is deferred to post-Stage-5 release (real hardware validation), at which point a large-scale simulation campaign will be conducted to determine the possible reason. This deferral is permitted because: (a) all snapshots remain above the 10% clinical threshold under the fix, (b) the device correctly flags pathological patients, and (c) root cause identification requires hardware-validated signal data that is not yet available.
+
+**Precedent Effect:**
+1. The `fabsf()` ban established by The VABS.F32 Case is reaffirmed. No future reinstatement of `fabsf()` on FPU-register values is permitted in any clinical computation path, including for demo purposes, without a new hearing.
+2. The SI magnitude underreporting finding (~8.4 pp below true SI at 25% injected asymmetry under the conditional-subtraction fix) is an open documented defect. It does not block Stage 3 advancement provided all snapshots remain above the 10% clinical threshold. It must be investigated in a post-Stage-5 large-scale simulation campaign before any clinical accuracy claim is made about SI magnitude.
+3. A device that correctly flags pathological patients (all snapshots above 10% threshold) but underreports magnitude is clinically incomplete, not clinically dangerous at the current threshold boundary. This distinction governs the deferral decision.
+
+**Files Changed:** `src/gait/rolling_window.c` — restore conditional-subtraction at line 31.
+
+> **IMMUTABLE — The BUG-013 Pathological False Negative Hearing closed 2026-04-03. This precedent cannot be amended, revised, or contradicted except by a new Judicial Hearing explicitly named on this case that cites a physical change (new hardware, new emulator version, new population) not in scope at closing.**
