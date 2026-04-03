@@ -25,7 +25,7 @@ tmux send-keys -t gaitsense_demo:0.0 "cd /Users/siyaoshao/gait_device && clear &
 tmux send-keys -t gaitsense_demo:0.1 "cd /Users/siyaoshao/gait_device && clear && echo '=== ATTORNEY-B ===' && claude" Enter
 
 # Pane 2 — EVIDENCE (top-right)
-tmux send-keys -t gaitsense_demo:0.2 "cd /Users/siyaoshao/gait_device && clear && echo '=== EVIDENCE TERMINAL — awaiting dispatch from Justice ==='" Enter
+tmux send-keys -t gaitsense_demo:0.2 "cd /Users/siyaoshao/gait_device && export GAITSENSE_DEMO=1 && clear && echo '=== EVIDENCE TERMINAL — awaiting dispatch from Justice ==='" Enter
 
 # Pane 3 — JUSTICE / main session (bottom-right)
 tmux send-keys -t gaitsense_demo:0.3 "cd /Users/siyaoshao/gait_device && clear && echo '=== JUSTICE ===' && claude" Enter

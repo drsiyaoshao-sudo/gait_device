@@ -14,8 +14,10 @@ Generated signals:
   - gyr_y: raw (no filtering for zero-crossing detection)
 """
 
+import os
 import sys
 import math
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -278,6 +280,8 @@ def main():
     plot_path = plot_dir / 'stair_step2_missing_zerocross.png'
     fig.savefig(plot_path, dpi=150, bbox_inches='tight')
     print(f"  Plot saved: {plot_path}")
+    if os.environ.get('GAITSENSE_DEMO'):
+        subprocess.Popen(['open', str(plot_path)])
     plt.close(fig)
 
     print()

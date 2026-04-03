@@ -86,8 +86,11 @@ tmux send-keys -t gaitsense_demo:0.1 \
 **Pane 2 (Evidence) — ready state:**
 ```bash
 tmux send-keys -t gaitsense_demo:0.2 \
-  "cd /Users/siyaoshao/gait_device && clear && echo '=== EVIDENCE TERMINAL ===' && echo 'Awaiting dispatch from Justice. Run: python3 diagnostic_imu_analysis.py'" Enter
+  "cd /Users/siyaoshao/gait_device && export GAITSENSE_DEMO=1 && clear && echo '=== EVIDENCE TERMINAL ===' && echo 'Awaiting dispatch from Justice. Run: python3 diagnostic_imu_analysis.py'" Enter
 ```
+`GAITSENSE_DEMO=1` causes both diagnostic scripts to call `open <plot_path>` after
+`savefig()` — plots pop up in macOS Preview automatically. Without the env var,
+scripts run headless (Agg backend, save only — safe for CI).
 
 **Pane 3 (Justice) — SOP reminder then Claude:**
 ```bash

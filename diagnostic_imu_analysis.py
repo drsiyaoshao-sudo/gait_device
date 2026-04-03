@@ -13,8 +13,10 @@ Filtering applied:
 - gyr_y_hp: 30 Hz high-pass Butterworth, 2nd order (matches firmware step detector)
 """
 
+import os
 import sys
 import math
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -347,6 +349,8 @@ def main():
     plot_path = plot_dir / 'stair_vs_flat_imu_diagnostic.png'
     fig.savefig(plot_path, dpi=150, bbox_inches='tight')
     print(f"  Plot saved: {plot_path}")
+    if os.environ.get('GAITSENSE_DEMO'):
+        subprocess.Popen(['open', str(plot_path)])
     plt.close(fig)
 
     print()
