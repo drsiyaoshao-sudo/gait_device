@@ -41,6 +41,8 @@ Judicial Hearing, or Amendment vote:
 - Always save at dpi=150 minimum
 - Always print the data table to stdout before saving the figure so the
   human can read measurements without opening the image
+- After saving, check if `GAITSENSE_DEMO=1` is set in the environment.
+  If so, run `open <saved_plot_path>` so the figure pops up in Preview automatically.
 
 ## What you do NOT do
 

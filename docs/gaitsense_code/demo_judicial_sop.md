@@ -2,9 +2,8 @@
 ## Subject: BUG-013 (VABS.F32 Silent SI Zeroing)
 
 **Purpose:** Step-by-step recording guide for a live demo of the GaitSense
-judicial hearing process using BUG-013 as the case study. Four panels run
-simultaneously: Attorney-A, Attorney-B, evidence terminal, and the Justice
-(main Claude Code session).
+judicial hearing process using BUG-013 as the case study. Single terminal
+session — Justice runs Claude Code and dispatches agents sequentially.
 
 ---
 
@@ -17,44 +16,15 @@ simultaneously: Attorney-A, Attorney-B, evidence terminal, and the Justice
 
 ---
 
-## Screen Layout
-
-```
-┌──────────────────────────────┬──────────────────────────────┐
-│  PANE 1 — ATTORNEY-A (red)   │  PANE 2 — ATTORNEY-B (blue)  │
-│  Argues Position A:          │  Argues Position B:          │
-│  "Renode artifact, no        │  "Silent false negative,     │
-│   clinical consequence"      │   pathological test needed"  │
-├──────────────────────────────┼──────────────────────────────┤
-│  PANE 3 — EVIDENCE           │  PANE 4 — JUSTICE (main)     │
-│  python-simulator-operator   │  Human arbitration session   │
-│  uart-reader output          │  Declares hearing, rules     │
-│  plotter popup               │  at Step 6                   │
-└──────────────────────────────┴──────────────────────────────┘
-```
-
----
-
-## Step 0 — tmux Setup
+## Step 0 — Start the demo
 
 ```bash
-# Create 4-pane session
-tmux new-session -s gaitsense_demo -x 220 -y 50
-tmux split-window -h
-tmux select-pane -t 0
-tmux split-window -v
-tmux select-pane -t 2
-tmux split-window -v
-
-# Label panes
-tmux select-pane -t 0 -T "ATTORNEY-A"
-tmux select-pane -t 2 -T "ATTORNEY-B"
-tmux select-pane -t 1 -T "EVIDENCE"
-tmux select-pane -t 3 -T "JUSTICE"
-
-# Start Claude Code in all four panes
-# (navigate to project root first in each)
+cd /Users/siyaoshao/gait_device
+bash demo_start.sh
+claude
 ```
+
+Then call the judicial-clerk agent to warm up all bureaucratic and attorney agents.
 
 ---
 
@@ -99,7 +69,7 @@ and src/gait/rolling_window.c before constructing your argument.
 Present all four required argument elements.
 ```
 
-**Attorney-B initialization prompt (paste into Pane 2):**
+**Attorney-B initialization prompt (dispatch to attorney-B agent):**
 
 ```
 You are Attorney-B. The Justice has assigned you Position B in a Judicial
@@ -120,7 +90,7 @@ Present all four required argument elements.
 
 ---
 
-## Step 3+4 — Attorneys Argue (Panes 1 and 2 run in parallel)
+## Step 3+4 — Attorneys Argue (dispatched sequentially)
 
 Each attorney presents:
 1. Amendment invoked (exact number + title)
@@ -132,16 +102,16 @@ Each attorney presents:
 
 ---
 
-## Step 5 — Justice Requests Evidence (Pane 4 → Pane 3)
+## Step 5 — Justice Requests Evidence
 
-After both arguments, type into Pane 4:
+After both arguments, dispatch the simulator-operator and uart-reader agents:
 
 ```
 Show me the pathological walker UART output — all 9 snapshots.
 Also generate the stance timing plot showing odd vs even stance duration.
 ```
 
-**Pane 3 — run evidence commands:**
+**Evidence commands (run via simulator-operator or directly):**
 
 ```bash
 # UART evidence: pathological mode, all 4 profiles

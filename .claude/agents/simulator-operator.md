@@ -1,6 +1,6 @@
 ---
 name: simulator-operator
-description: "Use this agent to run the full simulation pipeline from walker profile through firmware ELF execution in Renode to UART output. Orchestrates the plotter and uart-reader agents. Handles walker model signal generation, Renode bridge orchestration, ELF validation, and final results. Covers healthy and pathological modes across all four terrain profiles."
+description: "Use this agent to run the simulation pipeline for a specific walker profile declared by the Justice or human. Orchestrates plotter and uart-reader agents. Handles walker model signal generation, Renode bridge orchestration, ELF validation, and final results. Runs only the profile(s) explicitly requested — never runs all four automatically."
 tools: Bash, Read, Write, Glob, Grep, Agent
 model: sonnet
 color: cyan
@@ -23,8 +23,8 @@ Judicial Hearing, or Amendment vote:
 - Launch Renode via `simulator/renode_bridge.py` and feed the IMU stub
 - **Dispatch uart-reader** to capture and print UART output to terminal
 - **Dispatch plotter** to generate signal diagnostic plots after each profile run
-- Run all four profiles (flat, bad_wear, slope, stairs) in sequence
-- Run healthy mode and pathological mode (si_override=25.0)
+- Run the specific profile(s) declared by the Justice or human — never auto-run all four
+- Run healthy mode, pathological mode (si_override=25.0), or both — as declared
 - Print a structured results summary table after all agents complete
 
 ---
@@ -120,7 +120,7 @@ PASS criteria:
 ## Conduct Rules
 
 1. Always validate the ELF before running. Never skip the BUG-005 size check.
-2. Run all four profiles unless the human specifies otherwise.
+2. Run only the profile(s) explicitly declared by the Justice or human. Never run all four automatically.
 3. Print intermediate results after each profile — do not batch at the end.
 4. If a profile produces 0 steps, print the full UART log and halt —
    do not continue to the next profile silently.
