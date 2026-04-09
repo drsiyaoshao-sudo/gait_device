@@ -5,6 +5,10 @@
     "mcu": "nrf52840",
     "zephyr": {
       "variant": "nrf52840dk_nrf52840"
+    },
+    "softdevice": {
+      "sd_flags": "-DNRF52840_XXAA",
+      "sd_fwid": "0x0000"
     }
   },
   "connectivity": ["bluetooth"],
