@@ -18,14 +18,15 @@
  */
 
 &i2c0 {
+    /* XIAO nRF52840 Sense: D4/SDA = P0.05, D5/SCL = P0.04 */
+    sda-pin = <5>;
+    scl-pin = <4>;
     status = "okay";
 
     lsm6dso: lsm6dso@6a {
-        label = "LSM6DSO";
-        compatible = "st,lsm6dso";    /* LSM6DSO driver; register-compatible with LSM6DS3TR-C */
+        label = "LSM6DSL";
+        compatible = "st,lsm6dsl";    /* LSM6DSL driver matches LSM6DS3TR-C WHO_AM_I=0x6A */
         reg = <0x6a>;
-        irq-gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>;  /* INT1 → P0.11 */
-        int-pin = <1>;
     };
 };
 
@@ -45,5 +46,13 @@
             gpios = <&gpio0 27 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
             label = "Session Button";
         };
+    };
+};
+
+/* USB CDC ACM — used by xiaoble_sense_hello; harmless when CONFIG_USB_CDC_ACM is not set */
+&zephyr_udc0 {
+    cdc_acm_uart0: cdc_acm_uart0 {
+        compatible = "zephyr,cdc-acm-uart";
+        label = "CDC_ACM_0";
     };
 };
