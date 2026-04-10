@@ -148,6 +148,16 @@ Expansion: This rule prevents the most common failure mode in agentic developmen
 
 Any constant that cannot be derived algebraically from the three walking primitives but is instead derived from a population distribution of one or more primitives must document: the distribution (μ, σ), the sigma bound applied, and any population explicitly excluded from the bound.
 
+---
+
+### Amendment 16 — Firmware Smoke Test Order and Path Switching
+*Traces to: Article I + II*
+*Ratified: 2026-04-10. Proposed by: sole human engineer. Ratified by: sole human engineer.*
+
+For every hardware bring-up phase, firmware validation must proceed in this exact order: (1) hello-world counter over USB, (2) sensor smoke test over USB, (3) algorithm output over USB, (4) Bluetooth. If a firmware toolchain fails to pass a smoke test within three attempts (Amendment 7), that toolchain is blocked for the remainder of the current phase and the next available toolchain is used. The blocked path is recorded and may only be re-evaluated at the start of the next development stage.
+
+Expansion: This rule prevents toolchain rabbit holes from consuming phase time. USB-first ordering ensures the communication path is validated before any sensor or algorithm complexity is added. Toolchain blocking prevents re-attempting a known-failed path without a stage-gate reset — the human must explicitly re-open a blocked toolchain at a new stage. The current blocked path record: Zephyr LSM6DSL driver (WHO_AM_I ret=-5 on XIAO nRF52840 Sense) — blocked as of 2026-04-10, Arduino toolchain is the active path for Stage 1 sensor smoke test.
+
 Expansion: This amendment closes the gap between Amendment 13 (algebraically derived constants) and constants derived from population statistics of walking primitives. A constant derived from the cadence distribution still traces to Article I — but the statistical path must be made explicit. The failure mode without this rule: statistically derived constants accumulate as undocumented magic numbers that pass Article I review because a primitive is nominally involved, but carry no derivation that predicts their correct value when the target population changes (paediatric, geriatric, athletic). The required documentation format is:
 
 ```
@@ -162,3 +172,25 @@ First application: `MIN_STEP_INTERVAL_MS = 250` in `src/gait/step_detector.c`.
 Human ambulation cadence ~ N(130, 30²) spm across walking + running population.
 2.5σ upper tail: 205 spm → minimum step period 293 ms → 250 ms with margin.
 Excluded: running downhill (>210 spm, out of scope for SI measurement device).
+
+---
+
+### Amendment 17 — Toolchain Alignment
+*Traces to: Article II*
+*Ratified: 2026-04-10. Proposed by: sole human engineer. Ratified by: sole human engineer.*
+
+Every agent working on this project must operate within the toolchain that is currently active and recorded in this document. No agent may introduce a new toolchain, framework, or build system without a Bill enacted through the Legislative Process. Switching toolchains mid-phase is not permitted — it requires a new stage gate.
+
+Expansion: The active toolchain record is the single source of truth for all build, flash, and test operations. An agent that silently switches from the active toolchain to a different one (e.g., Zephyr to Arduino, Arduino to MicroPython, PlatformIO to CMake direct) violates Article II regardless of whether the output compiles correctly. The failure mode without this rule: agents spend sessions fighting a toolchain boundary that was already resolved in a prior session, or introduce a new toolchain that invalidates prior validated work without any human decision being made.
+
+**Active toolchain record (as of 2026-04-10):**
+
+| Layer | Active Toolchain | Blocked Toolchain | Blocked Since |
+|-------|-----------------|-------------------|---------------|
+| Firmware build + flash | Arduino CLI (`Seeeduino:nrf52:xiaonRF52840Sense`) + sparse UF2 converter | Zephyr/PlatformIO (`xiaoble_sense_hello`) | 2026-04-10 |
+| Algorithm source | `src/gait/*.c` (C, framework-agnostic) ported to `.cpp` in Arduino sketch | — | — |
+| Simulation | Renode + PlatformIO (`xiaoble_sense_sim`) | — | — |
+| Unit tests | PlatformIO native (`native`) | — | — |
+| Serial monitor | `pyserial` direct read with DTR assert | `pio device monitor` | 2026-04-10 |
+
+A blocked toolchain may only be re-activated by explicit human decision at a stage gate, recorded in this table with a date and the reason the block was lifted.

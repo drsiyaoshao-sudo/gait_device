@@ -2,6 +2,8 @@
 #include <usb/usb_device.h>
 #include <drivers/uart.h>
 #include <drivers/sensor.h>
+#include <drivers/i2c.h>
+#include <drivers/gpio.h>
 #include <stdio.h>
 
 static void cdc_send(const struct device *dev, const char *buf, int len)
@@ -28,12 +30,34 @@ int main(void)
         k_sleep(K_MSEC(100));
     }
 
+    /* P1.08 driven HIGH by gpio-hog in overlay (fires before drivers init) */
+    cdc_send(cdc_uart, "P1.08 via hog\n", 14);
+
+    /* Direct WHO_AM_I probe — SDA=P0.07 SCL=P0.27 via TWIM */
+    const struct device *i2c = device_get_binding("I2C_0");
+    char sbuf[64];
+    if (!i2c) {
+        cdc_send(cdc_uart, "I2C_0 not found\n", 16);
+    } else {
+        cdc_send(cdc_uart, "I2C_0 ok\n", 9);
+        uint8_t reg = 0x0F, who = 0;
+        int r = i2c_write_read(i2c, 0x6A, &reg, 1, &who, 1);
+        int l = snprintf(sbuf, sizeof(sbuf), "WHO_AM_I@0x6A: ret=%d val=0x%02x\n", r, who);
+        cdc_send(cdc_uart, sbuf, l);
+    }
+
+    cdc_send(cdc_uart, "getting device\n", 15);
     imu = DEVICE_DT_GET_ANY(st_lsm6dsl);
-    if (!imu || !device_is_ready(imu)) {
-        const char *err = "IMU init failed\n";
-        cdc_send(cdc_uart, err, sizeof("IMU init failed\n") - 1);
+    if (!imu) {
+        cdc_send(cdc_uart, "ERR: no DT node\n", 16);
         return -1;
     }
+    cdc_send(cdc_uart, "DT node ok\n", 11);
+    if (!device_is_ready(imu)) {
+        cdc_send(cdc_uart, "ERR: not ready\n", 15);
+        return -1;
+    }
+    cdc_send(cdc_uart, "IMU ready\n", 10);
 
     struct sensor_value ax, ay, az, gx, gy, gz;
     int n = 0;
