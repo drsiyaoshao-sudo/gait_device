@@ -35,6 +35,7 @@ Position B: <position-B-description>
 Constitutional grounding to check before arguing:
   docs/gaitsense_code/amendments.md       — all ratified amendments (1–17)
   docs/gaitsense_code/case_law.md         — all recorded precedents
+  docs/toolchain_config.md               — active toolchain, blocked tools, pin map, repo registry
   CLAUDE.md Judicial Process §3–4         — Benjamin Franklin + Thomas Jefferson principles
 
 Evidence commands available during this hearing:

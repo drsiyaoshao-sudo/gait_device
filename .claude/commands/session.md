@@ -30,7 +30,17 @@ Article II (irreversibility) does not apply to Stage 0 — counter flashing is t
 
 ## Session Initialisation (always runs first)
 
-**Step 0 — Package check:**
+**Step 0a — Toolchain config check:**
+Read `docs/toolchain_config.md` before anything else. If the file is missing or
+lock status is not LOCKED: stop and print:
+  "Toolchain config missing or unlocked. Run /toolchain init (new project) or
+   /toolchain lock (Stage 0 complete) before starting a session."
+
+Print the active toolchain summary from the config (hardware, FQBN, flash method, BLE receiver).
+If any blocked toolchain appears in the config's active slot: stop and report the conflict
+before proceeding.
+
+**Step 0b — Package check:**
 Invoke `package-manager` to verify required Python packages:
 `bleak`, `pyserial`, `numpy`, `scipy`, `matplotlib`, and any packages in `requirements.txt`.
 Do not proceed to constitutional record print until package-manager reports clean.
