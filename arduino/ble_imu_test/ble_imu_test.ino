@@ -59,15 +59,19 @@ void loop() {
     delay(5);   /* ~200 Hz poll */
     if (++n % 20 != 0) return;  /* send ~10 Hz */
 
-    char buf[80];
-    int len = snprintf(buf, sizeof(buf),
-        "ax:%.2f ay:%.2f az:%.2f gx:%.1f gy:%.1f gz:%.1f\n",
-        myIMU.readFloatAccelX(), myIMU.readFloatAccelY(), myIMU.readFloatAccelZ(),
-        myIMU.readFloatGyroX(),  myIMU.readFloatGyroY(),  myIMU.readFloatGyroZ());
+    /* Each write must be ≤20 bytes (MTU=23, ATT overhead=3).
+     * "A-9.81,-9.81,-9.81\n" = 20 bytes worst case.
+     * "G-999.9,-999.9,-999.9\n" = 22 — split to G%.0f,%.0f,%.0f\n = 14 max. */
+    char buf[22];
+    int len;
 
+    len = snprintf(buf, sizeof(buf), "A%.2f,%.2f,%.2f\n",
+        myIMU.readFloatAccelX(), myIMU.readFloatAccelY(), myIMU.readFloatAccelZ());
     Serial.print(buf);
+    bleuart.write(buf, len);
 
-    if (Bluefruit.connected()) {
-        bleuart.write(buf, len);
-    }
+    len = snprintf(buf, sizeof(buf), "G%.1f,%.1f,%.1f\n",
+        myIMU.readFloatGyroX(), myIMU.readFloatGyroY(), myIMU.readFloatGyroZ());
+    Serial.print(buf);
+    bleuart.write(buf, len);
 }

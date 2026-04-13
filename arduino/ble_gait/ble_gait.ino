@@ -4,11 +4,13 @@
  * Streams step count, cadence, and SI stance over Nordic UART Service.
  * nRF Connect → "GaitSense" → Nordic UART Service → enable notify.
  *
- * Output format (on every completed step):
- *   STEP #N stance=Xms swing=Yms cadence=Zspm si=A.B%
+ * Output format (on every completed step, ≤20 bytes for MTU=23):
+ *   S<step> <stance_ms> <swing_ms> <cadence_spm>
+ *   e.g. "S42 401 482 75\n"
  *
- * Output format (every 10 steps snapshot):
- *   SNAP step=N si_stance=A.B% si_swing=C.D% cadence=Z spm
+ * Output format (every 10 steps snapshot, ≤20 bytes):
+ *   N<step> <si_stance_int>.<si_stance_frac> <cadence>
+ *   e.g. "N40 62.5 80\n"
  */
 
 #include <bluefruit.h>
@@ -31,12 +33,11 @@ static void ble_print(const char *buf, int len) {
 }
 
 static void on_snapshot(const rolling_snapshot_t *snap) {
-    char buf[48];
-    int len = snprintf(buf, sizeof(buf),
-        "SNAP#%u si=%u.%u%% sw=%u.%u%% cd=%u\n",
+    /* "N10000 100.0 180\n" = 17 bytes worst case — fits MTU=23 */
+    char buf[20];
+    int len = snprintf(buf, sizeof(buf), "N%u %u.%u %u\n",
         snap->anchor_step_index,
         snap->si_stance_x10 / 10, snap->si_stance_x10 % 10,
-        snap->si_swing_x10  / 10, snap->si_swing_x10  % 10,
         snap->mean_cadence_x10 / 10);
     ble_print(buf, len);
 }
@@ -48,14 +49,12 @@ static void on_step_record(const step_record_t *rec) {
     r.cadence_spm = (cadence > 255.0f) ? 255 : (uint8_t)cadence;
     rolling_window_add_step(&r);
 
-    uint16_t si = rolling_window_si_stance_x10();
-    char buf[48];
-    int len = snprintf(buf, sizeof(buf),
-        "STEP#%u st=%u sw=%u cd=%d si=%u.%u%%\n",
+    /* "S10000 800 600 180\n" = 19 bytes worst case — fits MTU=23 */
+    char buf[20];
+    int len = snprintf(buf, sizeof(buf), "S%u %u %u %d\n",
         r.step_index,
         r.stance_duration_ms, r.swing_duration_ms,
-        (int)cadence,
-        si / 10, si % 10);
+        (int)cadence);
     ble_print(buf, len);
 }
 
