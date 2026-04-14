@@ -7,4 +7,4 @@
 website/.next
 .ruff_cache
 .vscode
-website/node_modules/.bin   
+website/node_modules/*   
