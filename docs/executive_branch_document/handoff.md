@@ -1,9 +1,9 @@
 # GaitSense — Hardware Handoff Document
 
 **Prepared by:** Simulation & Firmware Team
-**Date:** 2026-03-28 (updated — includes BUG-013 fix and pathological walker validation)
-**Branch:** main (also mirrored to handoff-testing)
-**Target recipient:** Engineer with medium-level embedded knowledge (nRF52840 / Zephyr familiarity assumed; gait algorithm internals documented here)
+**Date:** 2026-04-10 (updated — toolchain switch to Arduino; BLE NUS path validated on hardware)
+**Branch:** constitution-style-management (merging to main after Stage 4 close)
+**Target recipient:** Engineer with medium-level embedded knowledge (nRF52840 / Arduino familiarity assumed; Zephyr toolchain is **blocked** — see Section 3a)
 
 ---
 
@@ -37,21 +37,26 @@ SI = 0% → perfectly symmetric. SI > 5% is clinically significant. A single ank
 ### 1.2 Signal Pipeline
 
 ```
-IMU @ 208 Hz  (acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z)
+IMU @ ~200 Hz  (acc_x, acc_y, acc_z m/s², gyr_x, gyr_y, gyr_z dps)
+    │  LSM6DS3TR-C on-board, I2C 0x6A
+    │  readFloatAccel*() × 9.81f → m/s²; readFloatGyro*() → dps (no conversion)
     │
-    ▼  step_detector.c         Finds each heel strike timestamp
+    ▼  step_detector.cpp       Finds each heel strike timestamp
     │  → heel_strike_t: {ts_ms, step_index, peak_acc_mag, peak_gyr_y}
     │
-    ▼  phase_segmenter.c       Tracks LOADING→MID_STANCE→TERMINAL→TOE_OFF→SWING
-    │  → step_record_t: {stance_ms, swing_ms, cadence_spm, foot_angle}
+    ▼  phase_segmenter.cpp     Tracks LOADING→MID_STANCE→TERMINAL→TOE_OFF→SWING
+    │  → step_record_t: {stance_ms, swing_ms, cadence_spm}
     │
-    ▼  rolling_window.c        200-step circular buffer, snapshot every 10 steps
-    │  → rolling_snapshot_t: {si_stance_x10, si_swing_x10, mean_cadence_x10, ...}
+    ▼  rolling_window.cpp      200-step circular buffer, snapshot every 10 steps
+    │  → rolling_snapshot_t: {si_stance_x10, si_swing_x10, mean_cadence_x10}
     │
-    ▼  snapshot_buffer.c       5500 × 18-byte RAM ring buffer
-    │
-    ▼  ble_gait_svc.c          GATT export on CTRL_EXPORT command
+    ▼  BLEUart (Nordic UART Service, NUS)
+       Per-step: "STEP#N st=Xms sw=Yms cd=Zspm si=A.B%\n"
+       Per-snapshot (every 10 steps): "SNAP#N si=A.B% sw=C.D% cd=E\n"
+       Also mirrored to USB CDC (Serial) simultaneously.
 ```
+
+**Receiving on laptop:** `python3.11 scripts/ble_console.py` — scans for `GaitS`, connects automatically, prints all lines. Requires `bleak` (`python3.11 -m pip install bleak`). Always use `python3.11`; `bleak` is not installed on system Python 3.9.
 
 ### 1.3 Step Detector: Push-Off Primary with Retrospective Heel-Strike Inference
 
@@ -291,19 +296,76 @@ Full BOM: `docs/hw_bom.md`.
 
 ---
 
+## 3a. Toolchain Alignment — Read Before Building (Amendments 16 + 17)
+
+### Active Toolchain
+
+| Layer | Tool | Version / Notes |
+|-------|------|-----------------|
+| Firmware IDE | Arduino CLI | `arduino-cli` — `Seeeduino:nrf52` core |
+| Board FQBN | `Seeeduino:nrf52:xiaonRF52840Sense` | includes Bluefruit52Lib + LSM6DS3 library |
+| Flash method | Sparse UF2 (double-tap RST) | `sd_bl.bin` at 0x1000 + app hex at 0x27000 → combined UF2 |
+| Serial monitor | `pio device monitor` or `screen /dev/tty.usbmodem*` | USB CDC on same USB-C port |
+| BLE receiver | `python3.11 scripts/ble_console.py` | `bleak` library; always python3.11 |
+
+### Blocked Toolchain
+
+| Toolchain | Status | Reason |
+|-----------|--------|--------|
+| Zephyr + PlatformIO | **BLOCKED** (Amendment 16, 2026-04-10) | LSM6DS3TR-C WHO_AM_I returns EIO after 3 independent fix attempts. Root cause: P0.27 SCL pin conflict with session button overlay + regulator-fixed boot timing. Three-strike rule triggered. |
+
+**Do not attempt Zephyr bring-up.** If the Zephyr block is ever re-opened, a new Bill and Judicial Hearing are required per Amendment 16.
+
+### UF2 Flash Workflow
+
+```bash
+# 1. Build with Arduino CLI
+arduino-cli compile --fqbn Seeeduino:nrf52:xiaonRF52840Sense arduino/ble_gait
+
+# 2. Build sparse UF2 (SoftDevice + app)
+#    sd_bl.bin is at: /tmp/seeed_bl/sd_bl.bin
+#    app hex is at: arduino/ble_gait/build/Seeeduino.nrf52.xiaonRF52840Sense/ble_gait.ino.hex
+python3 scripts/make_sparse_uf2.py \
+    --sd /tmp/seeed_bl/sd_bl.bin \
+    --app arduino/ble_gait/build/Seeeduino.nrf52.xiaonRF52840Sense/ble_gait.ino.hex \
+    --out /tmp/xiao_ble_gait.uf2
+
+# 3. Double-tap RST on board → XIAO-SENSE volume mounts
+# 4. Copy UF2 — volume auto-ejects on success
+cp /tmp/xiao_ble_gait.uf2 /Volumes/XIAO-SENSE/
+```
+
+**SoftDevice note:** `sd_bl.bin` (S140 v7.3.0 SoftDevice + Seeed bootloader) must be present at `/tmp/seeed_bl/sd_bl.bin`. Extract once from the Seeed nrf52 nrfutil package if not present.
+
+**Why sparse UF2:** The Arduino app links at 0x27000 (SoftDevice offset). A flat binary from 0x1000 fills the SoftDevice region with zeros and crashes. The sparse converter builds a page map that skips the gap — only pages with real data are written.
+
+### Amendment 16 — Smoke Test Order
+
+Every new firmware feature must follow this order before it is considered validated:
+
+1. USB counter smoke test (USB CDC, counting only)
+2. USB sensor smoke test (USB CDC, raw IMU values)
+3. USB algorithm test (USB CDC, gait step + SI output)
+4. BLE algorithm test (BLE NUS, same output over wireless)
+
+If step N fails on three independent attempts, that path is blocked and the next toolchain is evaluated.
+
+---
+
 ## 4. Perfboard Assembly
 
 ### 4.1 Pin Assignment Note — Read Before Soldering
 
-The firmware's device tree overlay (`boards/xiao_ble_sense.overlay`) currently targets the **nRF52840 DK BSP** (board `nrf52840dk_nrf52840`), not a custom XIAO overlay. This means:
+The active firmware is Arduino-based. The Seeed nrf52 Arduino core handles pin mapping automatically:
 
-- **LED → P0.13**: On the nRF52840 DK this is the on-board LED1 pad. On XIAO nRF52840 Sense, P0.13 is the RED channel of the built-in RGB LED — **no external LED pad needed for initial bring-up**. The RGB LED (active-low) will serve as the status indicator on the XIAO itself.
+- **IMU power (P1.08):** automatically controlled by `PIN_LSM6DS3TR_C_POWER` (pin 15 in the Seeed core). No DTS overlay or manual GPIO needed.
+- **IMU I2C (SDA P0.07, SCL P0.27):** exposed as `Wire1` in the Seeed core. The LSM6DS3 library uses `Wire1` internally on `ARDUINO_SEEED_XIAO_NRF52840_SENSE`. No external wiring.
+- **Status LED:** P0.13 = RED channel of built-in RGB LED (active-low). No external LED pad needed for initial bring-up.
+- **Button (for future session control):** use D0 (P0.02) — it is the only reliably free exposed pad. P0.27 = SCL; do not use as button.
 
-- **Button → P0.27**: On the nRF52840 DK this is Button 0. P0.27 is not directly exposed as a labelled pad on the XIAO Sense (it is used internally for SWD CLK during programming). For standalone XIAO assembly, the device tree overlay must be updated to remap the button to an exposed pad (e.g. D0 = P0.02).
+**For initial bench bring-up**, no perfboard needed — connect XIAO by USB-C only. The Arduino firmware runs directly, IMU and BLE are self-contained on the XIAO Sense PCB.
 
-**For initial bench bring-up**, use the nRF52840 DK board — both LED and button are on the DK PCB, no perfboard needed.
-
-**For standalone XIAO assembly**, update the overlay then solder per the diagram below.
+**For standalone XIAO assembly**, solder per the diagram below (button and LED circuits remain valid).
 
 ### 4.2 Perfboard Circuit Diagram (Standalone XIAO Assembly)
 
@@ -412,56 +474,90 @@ After updating the overlay to use exposed XIAO pads (example: button → D0/P0.0
 
 ## 6. Bench Bring-Up Sequence
 
-Work through in order.
+Follow Amendment 16 smoke test order. Work through steps in order — do not skip.
 
-### Step 1 — Continuity Check (unpowered)
+### Step 0 — Hardware Check (unpowered)
 
-- [ ] Button: continuity GND↔GPIO when pressed, open when released
-- [ ] LED + resistor: correct polarity, no short to adjacent pads
-- [ ] Battery JST-PH: red = positive, matches XIAO marking
+- [ ] Board is **XIAO nRF52840 Sense** (102010448) — verify "Sense" on silkscreen
+- [ ] If perfboard assembly: Button continuity GND↔GPIO when pressed; LED polarity correct; Battery JST-PH positive (red) matches XIAO marking
 
-### Step 2 — First Power-On (DK or XIAO)
+### Step 1 — Counter Smoke Test (USB)
 
-Connect J-Link. Open RTT viewer:
+Flash `arduino/ble_counter_test/ble_counter_test.ino` using the sparse UF2 workflow (Section 3a).
+
+Monitor via USB serial:
 ```bash
-JLinkRTTViewer --device nRF52840_xxAA --RTTChannel 0
+screen /dev/tty.usbmodem* 115200
+# or
+pio device monitor -e xiaoble_sense_hello
 ```
 
-Expected boot log:
+Expected output (one line per second):
 ```
-<inf> calibration: No stored calibration — running calibration now
-<inf> calibration: Calibration complete
-```
-
-**No RTT output:** ELF not flashed. Re-flash and verify with `nrfjprog --readback`.
-
-### Step 3 — IMU Verification
-
-After 2 s stationary, calibration output should show:
-- `acc_z bias ≈ 0.0 m/s²` (gravity subtracted)
-- `gyro bias < 10 mdps` all axes
-
-**If calibration does not appear:** On XIAO Sense, the LSM6DS3TR-C is soldered on-board at I2C address 0x6A — no external wiring needed. Failure here means wrong XIAO variant (non-Sense) or I2C overlay mismatch.
-
-### Step 4 — FIFO Interval Verification
-
-In RTT log, inter-batch timestamps:
-```
-<inf> imu_reader: batch ts=XXXXms  n=32
-<inf> imu_reader: batch ts=XXXXms  n=32
+counter=1
+counter=2
+counter=3
 ```
 
-**Expected:** 153–155 ms between batches.
-**Pass criterion:** within ±5 ms of 154 ms, consistent, no missed batches.
+**Pass:** counter increments, no resets. **If blank:** wrong XIAO variant, or USB-C cable is charge-only (no data lines).
 
-### Step 5 — Session Lifecycle
+### Step 2 — IMU Smoke Test (USB)
 
-1. Stand still 2 s (calibration)
-2. Short button press → LED blinks fast (250 ms period) = recording
-3. Walk 50 steps
-4. Long button press ≥ 2 s → LED slow blink (1 s) = session complete
+Flash `arduino/imu_smoke_test/xiao_imu_test.ino`.
 
-Connect nRF Connect app, scan for `GaitSense`. Subscribe to GATT-0002, write `0x0003` to GATT-0003. Expected: 4–5 snapshot notifications for 50 steps.
+Expected output (~10 lines/sec):
+```
+ax:0.12 ay:-0.04 az:9.81 gx:0.02 gy:-0.01 gz:0.00
+```
+
+Pass criteria:
+- `az ≈ ±9.8 m/s²` when board is flat (gravity on Z axis)
+- `gx/gy/gz ≈ 0 dps` when board is still
+- Values update continuously; no freeze
+
+**If `IMU FAILED` prints and halts:** Wrong I2C address or non-Sense board. The LSM6DS3TR-C is only on the Sense variant (WHO_AM_I = 0x6A).
+
+### Step 3 — Gait Algorithm Smoke Test (USB)
+
+Flash `arduino/gait_algo_test/gait_algo_test.ino`.
+
+Walk or swing the board. Expected per-step output:
+```
+STEP #1 stance=401ms swing=482ms cadence=75spm si=0.0%
+STEP #2 stance=286ms swing=340ms cadence=92spm si=4.8%
+```
+
+Pass criteria:
+- Steps detected within 5 swings of motion
+- Cadence 60–130 spm (normal walking range)
+- SI changes between steps (non-zero after step 2)
+
+### Step 4 — BLE Algorithm Test
+
+Flash `arduino/ble_gait/ble_gait.ino`.
+
+On the laptop:
+```bash
+python3.11 scripts/ble_console.py
+```
+
+Expected scan + connect:
+```
+Scanning for 'GaitS*'...
+Found: GaitS [60AC2064-A117-D739-1214-236EC8F26AD5]
+Connecting...
+Connected. Subscribing to NUS TX...
+--- GaitSense output ---
+```
+
+Walk or swing. Expected output:
+```
+STEP#1 st=401 sw=482 cd=75 si=0.0%
+STEP#2 st=286 sw=340 cd=92 si=4.8%
+SNAP#9 si=2.1% sw=1.8% cd=88
+```
+
+**Pass:** All four smoke tests clear. Device is ready for Stage 5 physical validation (Section 7).
 
 ---
 
@@ -571,6 +667,8 @@ python host_tool/download_session.py --output session.csv
 
 ## 10. Simulation Re-Run Reference
 
+The Renode simulation pipeline runs the **same algorithm C source** (`src/gait/`) as the Arduino firmware — compiled for Cortex-M4F bare-metal via PlatformIO/Zephyr sim environment. The simulation toolchain is separate from the hardware firmware toolchain.
+
 ```bash
 # Full 4-profile validation with snapshot tables
 python scripts/test_all_profiles_full.py
@@ -584,25 +682,50 @@ python scripts/test_slope_100.py
 python scripts/test_stairs_100.py
 ```
 
-A pre-built validated ELF is at `firmware/zephyr_sim_2026-03-28.elf` — no PlatformIO toolchain needed to run these scripts. The bridge auto-detects it.
+Pre-built validated simulation ELF: `firmware/zephyr_sim_2026-03-28.elf` — BUG-013 fixed, all 4 profiles × healthy + pathological confirmed. Requires Renode 1.16.1 on PATH.
 
-If you have built locally, the bridge prefers `.pio/build/xiaoble_sense_sim/zephyr/zephyr.elf` over the pre-built ELF. Requires Renode 1.16.1 on PATH.
+**Note:** The simulation ELF (`CONFIG_GAIT_RENODE_SIM=y`) and the hardware Arduino firmware are two separate binaries. The simulation validates the algorithm; the Arduino firmware runs the same algorithm on real hardware. Both consume `src/gait/*.c` as the shared algorithm source.
 
 ---
 
 ## 11. File Reference
 
+### Algorithm Source (shared — simulation ELF and Arduino firmware)
+
+| File | Contents |
+|---|---|
+| `src/gait/step_detector.c` | Push-off primary step detector with ring-buffer heel-strike inference |
+| `src/gait/phase_segmenter.c` | Gait phase FSM — terrain-agnostic MID_STANCE gate |
+| `src/gait/rolling_window.c` | 200-step rolling window + CNN prior seeding; BUG-013 fix |
+
+### Arduino Hardware Firmware (active toolchain)
+
+| File | Contents |
+|---|---|
+| `arduino/ble_counter_test/ble_counter_test.ino` | Amendment 16 Step 1 — USB counter smoke test |
+| `arduino/imu_smoke_test/xiao_imu_test.ino` | Amendment 16 Step 2 — USB IMU smoke test |
+| `arduino/gait_algo_test/gait_algo_test.ino` | Amendment 16 Step 3 — USB gait algorithm test |
+| `arduino/ble_gait/ble_gait.ino` | Amendment 16 Step 4 — BLE NUS gait algorithm (**production firmware**) |
+| `arduino/ble_gait/step_detector.cpp` | Arduino port of step_detector.c (Zephyr logging removed) |
+| `arduino/ble_gait/phase_segmenter.cpp` | Arduino port of phase_segmenter.c |
+| `arduino/ble_gait/rolling_window.cpp` | Arduino port of rolling_window.c (fabsf directly, no Renode workaround) |
+| `scripts/ble_console.py` | Laptop BLE receiver — bleak/python3.11, line-buffered NUS output |
+| `scripts/make_sparse_uf2.py` | Sparse UF2 builder: sd_bl.bin + app hex → flashable UF2 |
+
+### Simulation Infrastructure
+
+| File | Contents |
+|---|---|
+| `firmware/zephyr_sim_2026-03-28.elf` | Pre-built validated ELF — BUG-013 fixed, all 4 profiles confirmed |
+| `scripts/test_all_profiles_full.py` | Single-command full pipeline verification |
+| `scripts/test_ble_export.py` | BLE binary export path validation |
+
+### Documentation
+
 | File | Contents |
 |---|---|
 | `docs/hw_bom.md` | Full BOM — part numbers, suppliers, prices |
 | `docs/sw_bom.md` | Software dependencies and versions |
-| `docs/bug_receipt.md` | All 13 simulation bugs — symptom, root cause, fix, files changed; hardware porting watch list |
+| `docs/bug_receipt.md` | All 13 simulation bugs — symptom, root cause, fix; hardware porting watch list |
 | `docs/algorithm_hunting_stair_walker.md` | Stair failure mode investigation with signal plots |
-| `src/gait/step_detector.c` | Push-off primary step detector with ring-buffer heel-strike inference |
-| `src/gait/phase_segmenter.c` | Gait phase FSM — terrain-agnostic MID_STANCE gate |
-| `src/gait/rolling_window.c` | 200-step rolling window + CNN prior seeding |
-| `src/ble/ble_gait_svc.c` | BLE GATT service — snapshot export |
-| `host_tool/download_session.py` | BLE host download tool |
-| `scripts/test_all_profiles_full.py` | Single-command full pipeline verification |
-| `firmware/zephyr_sim_2026-03-28.elf` | Pre-built validated ELF — BUG-013 fixed, all 4 profiles × healthy + pathological confirmed |
-| `boards/xiao_ble_sense.overlay` | Device tree — **update GPIO pins before standalone XIAO assembly** |
+| `docs/gaitsense_code/amendments.md` | Amendments 1–17 including Amendment 16 (smoke test order) and Amendment 17 (toolchain alignment) |
